@@ -1,0 +1,7 @@
+backend/data/
+backend/uploads/
+backend/tmp/
+backend/.gocache/
+backend/*.exe
+frontend/.next/
+frontend/node_modules/

@@ -1,0 +1,571 @@
+:root {
+  --bg: #f4efe6;
+  --panel: rgba(255, 250, 243, 0.88);
+  --panel-strong: #fff7ec;
+  --text: #1c1a18;
+  --muted: #6a6158;
+  --line: rgba(28, 26, 24, 0.12);
+  --accent: #b85c38;
+  --accent-dark: #7d3418;
+  --sage: #3d6b5c;
+  --shadow: 0 24px 60px rgba(77, 54, 34, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top right, rgba(184, 92, 56, 0.16), transparent 28%),
+    radial-gradient(circle at left center, rgba(61, 107, 92, 0.12), transparent 30%),
+    linear-gradient(160deg, #efe3d1 0%, #f6f1e8 42%, #ece3d7 100%);
+}
+
+a {
+  color: var(--accent-dark);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.page-shell {
+  width: min(1280px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.auth-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.brand-mark {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.topnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.topnav a,
+.link-button {
+  text-decoration: none;
+  color: var(--accent-dark);
+  border: 1px solid rgba(184, 92, 56, 0.16);
+  background: rgba(255, 247, 236, 0.78);
+  padding: 10px 14px;
+  border-radius: 999px;
+}
+
+.link-button.ghost {
+  background: rgba(61, 107, 92, 0.09);
+  color: var(--sage);
+  border-color: rgba(61, 107, 92, 0.18);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  align-items: end;
+  margin-bottom: 24px;
+}
+
+.hero.compact {
+  grid-template-columns: 1fr;
+}
+
+.auth-hero {
+  margin-bottom: 30px;
+}
+
+.eyebrow,
+.panel-kicker,
+.muted {
+  color: var(--muted);
+}
+
+.eyebrow,
+.panel-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.74rem;
+  margin: 0 0 10px;
+}
+
+.hero h1,
+.panel h2,
+.selected-lawyer h3,
+.progress-card h3,
+.faq-card h3 {
+  margin: 0;
+  font-weight: 600;
+}
+
+.hero h1 {
+  font-size: clamp(2.2rem, 4.5vw, 4.8rem);
+  line-height: 0.95;
+  max-width: 12ch;
+}
+
+.hero-copy {
+  max-width: 64ch;
+  color: var(--muted);
+  font-size: 1.02rem;
+  line-height: 1.6;
+}
+
+.hero-card,
+.panel {
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+}
+
+.hero-card {
+  padding: 22px;
+}
+
+.hero-card span {
+  display: block;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.hero-card strong {
+  display: block;
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 24px;
+}
+
+.auth-grid,
+.hub-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.auth-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.auth-grid.single {
+  grid-template-columns: minmax(0, 720px);
+}
+
+.hub-grid {
+  grid-template-columns: 0.85fr 1.15fr;
+}
+
+.hub-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.lower-grid {
+  margin-top: 24px;
+  grid-template-columns: 0.9fr 1.1fr;
+}
+
+.panel {
+  padding: 22px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.badge {
+  white-space: nowrap;
+  background: rgba(184, 92, 56, 0.1);
+  color: var(--accent-dark);
+  border: 1px solid rgba(184, 92, 56, 0.18);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.status-row,
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.chat-window,
+.message-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-window {
+  min-height: 360px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.bubble,
+.message-card,
+.faq-card,
+.selected-lawyer,
+.progress-card {
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  border-radius: 22px;
+}
+
+.bubble {
+  max-width: 85%;
+  padding: 14px 16px;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: rgba(61, 107, 92, 0.12);
+}
+
+.bubble.assistant {
+  align-self: flex-start;
+}
+
+.bubble span,
+.faq-card span,
+.message-meta span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.bubble p,
+.faq-card h3,
+.message-card p,
+.selected-lawyer p,
+.feature-card p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+
+.chat-form,
+.referral-form,
+.message-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.chat-form {
+  flex-direction: row;
+}
+
+.chat-form input,
+.referral-form input,
+.referral-form textarea,
+.message-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  padding: 14px 16px;
+  outline: none;
+}
+
+.referral-form textarea,
+.message-form textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+button,
+.upload-button {
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff9f5;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+button:hover,
+.upload-button:hover {
+  transform: translateY(-1px);
+}
+
+.faq-list,
+.lawyer-grid,
+.timeline {
+  display: grid;
+  gap: 12px;
+}
+
+.faq-card,
+.selected-lawyer {
+  padding: 16px;
+}
+
+.feature-card {
+  display: block;
+  text-decoration: none;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--panel-strong);
+  border-radius: 22px;
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.feature-card span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.feature-card h3 {
+  margin: 10px 0 0;
+}
+
+.static-card {
+  box-shadow: none;
+}
+
+.welcome-panel {
+  min-height: 100%;
+}
+
+.lawyer-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.lawyer-card {
+  text-align: left;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 248, 238, 0.88);
+  color: var(--text);
+}
+
+.lawyer-card.selected {
+  outline: 2px solid rgba(184, 92, 56, 0.35);
+  background: rgba(184, 92, 56, 0.12);
+}
+
+.lawyer-card strong,
+.lawyer-card span,
+.lawyer-card p,
+.lawyer-card small {
+  display: block;
+}
+
+.lawyer-card span,
+.lawyer-card small {
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.progress-card {
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(28, 26, 24, 0.08);
+  overflow: hidden;
+  margin: 14px 0 18px;
+}
+
+.progress-bar div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--sage), var(--accent));
+}
+
+.timeline-step {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.timeline-step span {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-top: 6px;
+  background: rgba(28, 26, 24, 0.18);
+}
+
+.timeline-step.completed span {
+  background: var(--sage);
+}
+
+.timeline-step.current span {
+  background: var(--accent);
+}
+
+.timeline-step h4,
+.timeline-step p,
+.message-meta strong {
+  margin: 0;
+}
+
+.timeline-step p {
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.message-card {
+  padding: 14px 16px;
+}
+
+.message-card.client {
+  background: rgba(61, 107, 92, 0.12);
+}
+
+.message-card.lawyer {
+  background: rgba(184, 92, 56, 0.1);
+}
+
+.message-card.system {
+  background: rgba(28, 26, 24, 0.06);
+}
+
+.message-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.message-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-button input {
+  display: none;
+}
+
+.action-card {
+  margin-top: 16px;
+}
+
+.auth-copy {
+  margin-top: 14px;
+}
+
+.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.feedback {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: rgba(61, 107, 92, 0.12);
+}
+
+.feedback.error {
+  background: rgba(184, 92, 56, 0.12);
+}
+
+@media (max-width: 980px) {
+  .hero,
+  .grid,
+  .lower-grid,
+  .auth-grid,
+  .hub-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero h1 {
+    max-width: 16ch;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-shell {
+    width: min(100% - 20px, 1280px);
+    padding-top: 20px;
+  }
+
+  .panel,
+  .hero-card {
+    border-radius: 22px;
+    padding: 18px;
+  }
+
+  .chat-form,
+  .message-actions,
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  button,
+  .upload-button {
+    width: 100%;
+  }
+}
