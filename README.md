@@ -29,7 +29,7 @@ This repository is a local starter for a legal consultant website with:
 From the project root:
 
 ```powershell
-go run run.go
+go run start.go
 ```
 
 This starts:
