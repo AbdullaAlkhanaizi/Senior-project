@@ -6,6 +6,7 @@ export default function HomePage() {
     <PortalShell
       title="Home hub for the legal consultant website"
       description="Use this page to direct users to the AI assistant, FAQ suggestions, or the lawyer messaging workspace."
+      hideHero={true}
     >
       <HomeClient />
     </PortalShell>
