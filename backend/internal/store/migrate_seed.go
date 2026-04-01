@@ -45,11 +45,14 @@ func (s *Store) Migrate(ctx context.Context) error {
 			title TEXT NOT NULL,
 			summary TEXT NOT NULL,
 			status TEXT NOT NULL,
+			decision_status TEXT NOT NULL DEFAULT 'pending',
+			decision_note TEXT NOT NULL DEFAULT '',
 			progress_percent INTEGER NOT NULL,
 			client_name TEXT NOT NULL,
 			client_user_id INTEGER,
 			lawyer_id INTEGER NOT NULL,
 			created_at TEXT NOT NULL,
+			responded_at TEXT NOT NULL DEFAULT '',
 			FOREIGN KEY (client_user_id) REFERENCES users(id),
 			FOREIGN KEY (lawyer_id) REFERENCES lawyers(id)
 		);`,
@@ -70,6 +73,17 @@ func (s *Store) Migrate(ctx context.Context) error {
 			body TEXT NOT NULL,
 			attachment_name TEXT NOT NULL DEFAULT '',
 			attachment_path TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL,
+			FOREIGN KEY (case_id) REFERENCES cases(id)
+		);`,
+		`CREATE TABLE IF NOT EXISTS case_events (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			case_id INTEGER NOT NULL,
+			actor_role TEXT NOT NULL,
+			actor_name TEXT NOT NULL,
+			from_status TEXT NOT NULL,
+			to_status TEXT NOT NULL,
+			note TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL,
 			FOREIGN KEY (case_id) REFERENCES cases(id)
 		);`,
@@ -99,10 +113,37 @@ func (s *Store) Migrate(ctx context.Context) error {
 	if err := s.ensureColumn(ctx, "cases", "client_user_id", "INTEGER"); err != nil {
 		return err
 	}
+	if err := s.ensureColumn(ctx, "cases", "decision_status", "TEXT NOT NULL DEFAULT 'pending'"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn(ctx, "cases", "decision_note", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn(ctx, "cases", "responded_at", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+
+	if _, err := s.db.ExecContext(ctx, `
+		UPDATE cases
+		SET decision_status = CASE
+			WHEN LOWER(status) LIKE '%declin%' THEN 'declined'
+			WHEN LOWER(status) LIKE '%waiting%' OR LOWER(status) LIKE '%pending%' THEN 'pending'
+			ELSE 'accepted'
+		END
+		WHERE TRIM(COALESCE(decision_status, '')) = ''`); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `
+		UPDATE cases
+		SET responded_at = created_at
+		WHERE decision_status IN ('accepted', 'declined') AND TRIM(COALESCE(responded_at, '')) = ''`); err != nil {
+		return err
+	}
 
 	indexStatements := []string{
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_lawyers_user_id ON lawyers(user_id) WHERE user_id IS NOT NULL;`,
 		`CREATE INDEX IF NOT EXISTS idx_cases_client_user_id ON cases(client_user_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_case_events_case_id ON case_events(case_id);`,
 	}
 
 	for _, statement := range indexStatements {
@@ -274,16 +315,19 @@ func (s *Store) seedSampleCase(ctx context.Context, sampleClient models.AuthResp
 
 	now := time.Now().UTC()
 	caseResult, err := tx.ExecContext(ctx, `
-		INSERT INTO cases (title, summary, status, progress_percent, client_name, client_user_id, lawyer_id, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO cases (title, summary, status, decision_status, decision_note, progress_percent, client_name, client_user_id, lawyer_id, created_at, responded_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"Traffic citation review",
 		"User asked whether a red-light violation requires court follow-up and uploaded the fine notice.",
 		"Review in progress",
+		"accepted",
+		"Documents received. Initial review started.",
 		55,
 		sampleClient.Name,
 		sampleClient.ID,
 		lawyerID,
 		now.Format(timeLayout),
+		now.Add(30*time.Minute).Format(timeLayout),
 	)
 	if err != nil {
 		return err
@@ -347,6 +391,20 @@ func (s *Store) seedSampleCase(ctx context.Context, sampleClient models.AuthResp
 		); err != nil {
 			return err
 		}
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO case_events (case_id, actor_role, actor_name, from_status, to_status, note, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		caseID,
+		models.RoleLawyer,
+		"Noor Al-Sayed",
+		"pending",
+		"accepted",
+		"Documents received. Initial review started.",
+		now.Add(30*time.Minute).Format(timeLayout),
+	); err != nil {
+		return err
 	}
 
 	return tx.Commit()

@@ -2,39 +2,66 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { API_BASE, createCase, getDashboard, sendCaseMessage, uploadCaseAttachment } from "../lib/api";
+import {
+  API_BASE,
+  createCase,
+  decideCase,
+  getCaseDetails,
+  getCases,
+  getDashboard,
+  sendCaseMessage,
+  uploadCaseAttachment
+} from "../lib/api";
 import { loadSession } from "../lib/session";
 
 export default function MessagingClient() {
   const [session, setSession] = useState(null);
-  const [dashboard, setDashboard] = useState(null);
-  const [selectedLawyerId, setSelectedLawyerId] = useState(1);
+  const [lawyers, setLawyers] = useState([]);
+  const [cases, setCases] = useState([]);
+  const [activeCase, setActiveCase] = useState(null);
+  const [selectedCaseId, setSelectedCaseId] = useState(null);
+  const [selectedLawyerId, setSelectedLawyerId] = useState(0);
+  const [issueSummary, setIssueSummary] = useState("");
   const [messageInput, setMessageInput] = useState("");
-  const [clientName, setClientName] = useState("Sample Client");
-  const [caseTitle, setCaseTitle] = useState("Need help reviewing my legal issue");
-  const [caseSummary, setCaseSummary] = useState("The chatbot marked this issue as complex and suggested a lawyer.");
+  const [decisionNote, setDecisionNote] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [loadingCases, setLoadingCases] = useState(true);
 
   useEffect(() => {
     const currentSession = loadSession();
     setSession(currentSession);
-    if (currentSession?.name) {
-      setClientName(currentSession.name);
-    }
-  }, []);
 
-  useEffect(() => {
     async function load() {
+      setLoadingCases(true);
       try {
-        const data = await getDashboard();
-        setDashboard(data);
-        if (data.lawyers?.[0]?.id) {
-          setSelectedLawyerId(data.lawyers[0].id);
+        const dashboardData = await getDashboard();
+        setLawyers(dashboardData.lawyers || []);
+        if (dashboardData.lawyers?.[0]?.id) {
+          setSelectedLawyerId(dashboardData.lawyers[0].id);
+        }
+
+        if (!currentSession?.token) {
+          setCases([]);
+          setActiveCase(null);
+          return;
+        }
+
+        const caseItems = await getCases();
+        setCases(caseItems);
+
+        if (caseItems[0]?.id) {
+          setSelectedCaseId(caseItems[0].id);
+          const details = await getCaseDetails(caseItems[0].id);
+          setActiveCase(details);
+        } else {
+          setActiveCase(null);
         }
       } catch (requestError) {
         setError(requestError.message);
+      } finally {
+        setLoadingCases(false);
       }
     }
 
@@ -46,34 +73,96 @@ export default function MessagingClient() {
   const isGuest = role === "guest";
   const isClient = role === "client";
   const isLawyer = role === "lawyer";
+  const selectedLawyer = lawyers.find((lawyer) => lawyer.id === Number(selectedLawyerId));
+  const canMessage = activeCase?.case?.decisionStatus === "accepted" && !isGuest;
 
-  const selectedLawyer = useMemo(() => {
-    return dashboard?.lawyers?.find((lawyer) => lawyer.id === Number(selectedLawyerId));
-  }, [dashboard, selectedLawyerId]);
+  const caseLabel = useMemo(() => {
+    if (!activeCase) {
+      return "No case selected";
+    }
+    if (isLawyer) {
+      return activeCase.case.clientName;
+    }
+    return activeCase.lawyer.name;
+  }, [activeCase, isLawyer]);
+
+  async function refreshCases(preferredCaseId) {
+    const caseItems = await getCases();
+    setCases(caseItems);
+
+    const nextCaseId = caseItems.some((item) => item.id === preferredCaseId)
+      ? preferredCaseId
+      : caseItems[0]?.id || null;
+
+    setSelectedCaseId(nextCaseId);
+
+    if (nextCaseId) {
+      const details = await getCaseDetails(nextCaseId);
+      setActiveCase(details);
+    } else {
+      setActiveCase(null);
+    }
+  }
+
+  async function handleSelectCase(caseId) {
+    setError("");
+    setStatus("Loading case...");
+    try {
+      const details = await getCaseDetails(caseId);
+      setSelectedCaseId(caseId);
+      setActiveCase(details);
+      setDecisionNote("");
+      setStatus("");
+    } catch (requestError) {
+      setError(requestError.message);
+      setStatus("");
+    }
+  }
 
   async function handleCaseCreate(event) {
     event.preventDefault();
     if (!isClient) {
-      setError("Only signed-in client accounts can create referral cases.");
+      setError("Only signed-in client accounts can create case requests.");
       return;
     }
 
-    setStatus("Creating referral...");
     setError("");
+    setStatus("Sending case request...");
 
     try {
       const data = await createCase({
-        title: caseTitle,
-        summary: caseSummary,
-        clientName,
+        summary: issueSummary,
         lawyerId: Number(selectedLawyerId)
       });
 
-      setDashboard((current) => ({
-        ...(current || {}),
-        activeCase: data
-      }));
-      setStatus(`Referral created with ${data.lawyer.name}.`);
+      setIssueSummary("");
+      setSelectedCaseId(data.case.id);
+      setActiveCase(data);
+      await refreshCases(data.case.id);
+      setStatus(`Case request sent to ${data.lawyer.name}.`);
+    } catch (requestError) {
+      setError(requestError.message);
+      setStatus("");
+    }
+  }
+
+  async function handleDecision(decision) {
+    if (!activeCase?.case?.id || !isLawyer) {
+      return;
+    }
+
+    setError("");
+    setStatus(`${decision === "accepted" ? "Accepting" : "Declining"} case...`);
+
+    try {
+      const details = await decideCase(activeCase.case.id, {
+        decision,
+        note: decisionNote
+      });
+      setActiveCase(details);
+      setDecisionNote("");
+      await refreshCases(details.case.id);
+      setStatus(`Case ${decision}.`);
     } catch (requestError) {
       setError(requestError.message);
       setStatus("");
@@ -82,7 +171,7 @@ export default function MessagingClient() {
 
   async function handleMessageSend(event) {
     event.preventDefault();
-    if (!dashboard?.activeCase?.case?.id || !messageInput.trim()) {
+    if (!activeCase?.case?.id || !messageInput.trim()) {
       return;
     }
 
@@ -90,16 +179,13 @@ export default function MessagingClient() {
     setError("");
 
     try {
-      const data = await sendCaseMessage(dashboard.activeCase.case.id, {
+      const data = await sendCaseMessage(activeCase.case.id, {
         body: messageInput
       });
 
-      setDashboard((current) => ({
-        ...(current || {}),
-        activeCase: {
-          ...current.activeCase,
-          messages: [...current.activeCase.messages, data]
-        }
+      setActiveCase((current) => ({
+        ...current,
+        messages: [...current.messages, data]
       }));
       setMessageInput("");
       setStatus("Message sent.");
@@ -111,7 +197,7 @@ export default function MessagingClient() {
 
   async function handleUpload(event) {
     const file = event.target.files?.[0];
-    if (!file || !dashboard?.activeCase?.case?.id) {
+    if (!file || !activeCase?.case?.id) {
       return;
     }
 
@@ -124,13 +210,10 @@ export default function MessagingClient() {
       formData.append("file", file);
       formData.append("message", `Uploaded file: ${file.name}`);
 
-      const data = await uploadCaseAttachment(dashboard.activeCase.case.id, formData);
-      setDashboard((current) => ({
-        ...(current || {}),
-        activeCase: {
-          ...current.activeCase,
-          messages: [...current.activeCase.messages, data]
-        }
+      const data = await uploadCaseAttachment(activeCase.case.id, formData);
+      setActiveCase((current) => ({
+        ...current,
+        messages: [...current.messages, data]
       }));
       setStatus(`Uploaded ${file.name}.`);
       event.target.value = "";
@@ -149,7 +232,7 @@ export default function MessagingClient() {
           <div className="panel-header">
             <div>
               <p className="panel-kicker">Access blocked</p>
-              <h2>Admin accounts cannot open message threads</h2>
+              <h2>Admin accounts cannot open case messaging</h2>
             </div>
           </div>
           <p className="hero-copy">
@@ -169,53 +252,92 @@ export default function MessagingClient() {
         <div className="panel referral-panel">
           <div className="panel-header">
             <div>
-              <p className="panel-kicker">{isLawyer ? "Assigned counsel" : "Part 2"}</p>
-              <h2>{isLawyer ? "Your lawyer profile" : "Lawyer referral"}</h2>
+              <p className="panel-kicker">{isLawyer ? "Case inbox" : "Request a lawyer"}</p>
+              <h2>{isLawyer ? "Assigned case requests" : "Choose a lawyer and describe the issue"}</h2>
             </div>
           </div>
 
-          <div className="lawyer-grid">
-            {dashboard?.lawyers?.map((lawyer) => (
-              <button
-                key={lawyer.id}
-                type="button"
-                className={`lawyer-card ${Number(selectedLawyerId) === lawyer.id ? "selected" : ""}`}
-                onClick={() => setSelectedLawyerId(lawyer.id)}
-                disabled={isLawyer}
-              >
-                <strong>{lawyer.name}</strong>
-                <span>{lawyer.firm}</span>
-                <p>{lawyer.specialty}</p>
-                <small>{lawyer.city}</small>
-              </button>
-            ))}
+          <div className="case-list">
+            {loadingCases ? (
+              <p className="muted">Loading cases...</p>
+            ) : cases.length > 0 ? (
+              cases.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`case-list-item ${selectedCaseId === item.id ? "selected" : ""}`}
+                  onClick={() => handleSelectCase(item.id)}
+                >
+                  <div className="case-list-top">
+                    <strong>{item.title}</strong>
+                    <span className={`mini-status ${item.decisionStatus}`}>{item.decisionStatus}</span>
+                  </div>
+                  <p>{isLawyer ? item.clientName : item.lawyerName}</p>
+                  <small>{item.status}</small>
+                </button>
+              ))
+            ) : (
+              <p className="muted">No cases yet.</p>
+            )}
           </div>
-
-          {selectedLawyer ? (
-            <div className="selected-lawyer">
-              <h3>{selectedLawyer.name}</h3>
-              <p>{selectedLawyer.bio}</p>
-              <p>{selectedLawyer.email}</p>
-              <p>{selectedLawyer.phone}</p>
-            </div>
-          ) : null}
 
           {isClient ? (
-            <form className="referral-form" onSubmit={handleCaseCreate}>
-              <input value={clientName} onChange={(event) => setClientName(event.target.value)} placeholder="Client name" />
-              <input value={caseTitle} onChange={(event) => setCaseTitle(event.target.value)} placeholder="Case title" />
+            <>
+              <div className="lawyer-grid">
+                {lawyers.map((lawyer) => (
+                  <button
+                    key={lawyer.id}
+                    type="button"
+                    className={`lawyer-card ${Number(selectedLawyerId) === lawyer.id ? "selected" : ""}`}
+                    onClick={() => setSelectedLawyerId(lawyer.id)}
+                  >
+                    <strong>{lawyer.name}</strong>
+                    <span>{lawyer.firm}</span>
+                    <p>{lawyer.specialty}</p>
+                    <small>{lawyer.city}</small>
+                  </button>
+                ))}
+              </div>
+
+              {selectedLawyer ? (
+                <div className="selected-lawyer">
+                  <h3>{selectedLawyer.name}</h3>
+                  <p>{selectedLawyer.bio}</p>
+                  <p>{selectedLawyer.email}</p>
+                  <p>{selectedLawyer.phone}</p>
+                </div>
+              ) : null}
+
+              <form className="referral-form" onSubmit={handleCaseCreate}>
+                <textarea
+                  value={issueSummary}
+                  onChange={(event) => setIssueSummary(event.target.value)}
+                  placeholder="Describe your issue so the lawyer can review and decide whether to accept the case."
+                />
+                <button type="submit">Send case request</button>
+              </form>
+            </>
+          ) : isLawyer && activeCase?.case?.decisionStatus === "pending" ? (
+            <div className="decision-panel">
+              <p className="hero-copy">
+                Review the issue summary, then accept or decline the request. The private thread opens only after acceptance.
+              </p>
               <textarea
-                value={caseSummary}
-                onChange={(event) => setCaseSummary(event.target.value)}
-                placeholder="Short referral summary"
+                className="decision-note"
+                value={decisionNote}
+                onChange={(event) => setDecisionNote(event.target.value)}
+                placeholder="Optional note for the client"
               />
-              <button type="submit">Create referral case</button>
-            </form>
+              <div className="decision-actions">
+                <button type="button" onClick={() => handleDecision("accepted")}>Accept case</button>
+                <button type="button" className="button-secondary" onClick={() => handleDecision("declined")}>Decline case</button>
+              </div>
+            </div>
           ) : (
             <p className="hero-copy">
               {isGuest
-                ? "Guest mode can preview the lawyer directory, but referral creation requires a signed-in client account."
-                : "Lawyer accounts receive assigned cases here and can continue protected communication inside the thread on the right."}
+                ? "Guest mode can preview lawyers, but sending a case request requires a client account."
+                : "Select a case from the list to review its status and conversation."}
             </p>
           )}
         </div>
@@ -223,27 +345,35 @@ export default function MessagingClient() {
         <div className="panel messaging-panel">
           <div className="panel-header">
             <div>
-              <p className="panel-kicker">{isLawyer ? "Lawyer workspace" : "Client workspace"}</p>
-              <h2>Messaging and case progress</h2>
+              <p className="panel-kicker">{isLawyer ? "Lawyer workspace" : "Case workspace"}</p>
+              <h2>{activeCase ? caseLabel : "Messaging and case progress"}</h2>
             </div>
-            <span className="badge">{dashboard?.activeCase?.case?.status || "No case loaded"}</span>
+            <span className="badge">{activeCase?.case?.status || "No case selected"}</span>
           </div>
 
-          {dashboard?.activeCase ? (
+          {activeCase ? (
             <>
               <div className="progress-card">
                 <div className="progress-meta">
                   <div>
-                    <p className="muted">Current case</p>
-                    <h3>{dashboard.activeCase.case.title}</h3>
+                    <p className="muted">Issue summary</p>
+                    <h3>{activeCase.case.title}</h3>
                   </div>
-                  <strong>{dashboard.activeCase.case.progressPercent}%</strong>
+                  <strong>{activeCase.case.progressPercent}%</strong>
                 </div>
+                <p className="case-summary-text">{activeCase.case.summary}</p>
+                <div className="case-meta-row">
+                  <span className={`mini-status ${activeCase.case.decisionStatus}`}>{activeCase.case.decisionStatus}</span>
+                  <span>{new Date(activeCase.case.createdAt).toLocaleString()}</span>
+                </div>
+                {activeCase.case.decisionNote ? (
+                  <p className="case-note"><strong>Lawyer note:</strong> {activeCase.case.decisionNote}</p>
+                ) : null}
                 <div className="progress-bar">
-                  <div style={{ width: `${dashboard.activeCase.case.progressPercent}%` }} />
+                  <div style={{ width: `${activeCase.case.progressPercent}%` }} />
                 </div>
                 <div className="timeline">
-                  {dashboard.activeCase.updates.map((step) => (
+                  {activeCase.updates.map((step) => (
                     <article key={step.id} className={`timeline-step ${step.state}`}>
                       <span />
                       <div>
@@ -256,7 +386,7 @@ export default function MessagingClient() {
               </div>
 
               <div className="message-feed">
-                {dashboard.activeCase.messages.map((item) => (
+                {activeCase.messages.map((item) => (
                   <article key={item.id} className={`message-card ${item.senderType}`}>
                     <div className="message-meta">
                       <strong>{item.senderName}</strong>
@@ -272,7 +402,7 @@ export default function MessagingClient() {
                 ))}
               </div>
 
-              {!isGuest ? (
+              {canMessage ? (
                 <form className="message-form" onSubmit={handleMessageSend}>
                   <textarea
                     value={messageInput}
@@ -289,15 +419,19 @@ export default function MessagingClient() {
                 </form>
               ) : (
                 <p className="hero-copy">
-                  Guest mode does not allow protected messages or file uploads. Sign in as a client to continue.
+                  {activeCase.case.decisionStatus === "pending"
+                    ? "Messaging opens after the lawyer accepts the case."
+                    : activeCase.case.decisionStatus === "declined"
+                      ? "This request was declined. Create a new request with another lawyer to continue."
+                      : "Sign in to continue."}
                 </p>
               )}
             </>
           ) : (
             <p className="muted">
               {isLawyer
-                ? "No case has been assigned to this lawyer account yet."
-                : "No case has been loaded for this account yet."}
+                ? "No case requests have been assigned to this lawyer account yet."
+                : "Choose a lawyer and submit your issue to start a case request."}
             </p>
           )}
         </div>

@@ -77,6 +77,31 @@ export async function createCase(payload) {
   return parseJSON(response);
 }
 
+export async function getCases() {
+  const response = await fetch(`${API_BASE}/api/cases`, {
+    cache: "no-store",
+    headers: withAuthHeaders()
+  });
+  return parseJSON(response);
+}
+
+export async function getCaseDetails(caseId) {
+  const response = await fetch(`${API_BASE}/api/cases/${caseId}`, {
+    cache: "no-store",
+    headers: withAuthHeaders()
+  });
+  return parseJSON(response);
+}
+
+export async function decideCase(caseId, payload) {
+  const response = await fetch(`${API_BASE}/api/cases/${caseId}/decision`, {
+    method: "POST",
+    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload)
+  });
+  return parseJSON(response);
+}
+
 export async function sendCaseMessage(caseId, payload) {
   const response = await fetch(`${API_BASE}/api/cases/${caseId}/messages`, {
     method: "POST",

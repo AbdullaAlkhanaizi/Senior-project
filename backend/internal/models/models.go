@@ -37,11 +37,15 @@ type CaseSummary struct {
 	Title           string `json:"title"`
 	Summary         string `json:"summary"`
 	Status          string `json:"status"`
+	DecisionStatus  string `json:"decisionStatus"`
+	DecisionNote    string `json:"decisionNote"`
 	ProgressPercent int    `json:"progressPercent"`
 	ClientName      string `json:"clientName"`
 	ClientUserID    int64  `json:"clientUserId,omitempty"`
 	LawyerID        int64  `json:"lawyerId"`
+	LawyerName      string `json:"lawyerName"`
 	CreatedAt       string `json:"createdAt"`
+	RespondedAt     string `json:"respondedAt,omitempty"`
 }
 
 type CaseUpdate struct {
@@ -76,6 +80,11 @@ type CreateCaseRequest struct {
 	ClientName   string `json:"clientName"`
 	LawyerID     int64  `json:"lawyerId"`
 	ClientUserID int64  `json:"-"`
+}
+
+type CaseDecisionRequest struct {
+	Decision string `json:"decision"`
+	Note     string `json:"note"`
 }
 
 type CreateMessageRequest struct {

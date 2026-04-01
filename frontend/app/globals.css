@@ -5376,6 +5376,99 @@ a.sm-btn:hover {
   max-width: 780px;
 }
 
+.case-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.case-list-item {
+  width: 100%;
+  text-align: left;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 249, 241, 0.9);
+  color: var(--text);
+  box-shadow: var(--shadow-card);
+}
+
+.case-list-item.selected {
+  outline: 2px solid rgba(188, 95, 58, 0.34);
+  outline-offset: 1px;
+  background: rgba(188, 95, 58, 0.12);
+}
+
+.case-list-item p,
+.case-list-item small,
+.case-summary-text,
+.case-note {
+  margin: 8px 0 0;
+}
+
+.case-list-top,
+.case-meta-row,
+.decision-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.case-meta-row {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.mini-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.mini-status.pending {
+  background: rgba(217, 119, 6, 0.14);
+  color: #9a5b00;
+}
+
+.mini-status.accepted {
+  background: rgba(22, 163, 74, 0.14);
+  color: #166534;
+}
+
+.mini-status.declined {
+  background: rgba(220, 38, 38, 0.12);
+  color: #991b1b;
+}
+
+.decision-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.decision-note {
+  width: 100%;
+  min-height: 110px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  resize: vertical;
+}
+
+.button-secondary {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
 @media (max-width: 900px) {
   .portal-account-strip {
     width: 100%;
@@ -5388,5 +5481,12 @@ a.sm-btn:hover {
 
   .admin-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .case-list-top,
+  .case-meta-row,
+  .decision-actions {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

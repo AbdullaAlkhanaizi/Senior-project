@@ -48,7 +48,7 @@ func (s *Server) handleCases(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, filtered)
 	case http.MethodPost:
 		if current.Role != models.RoleClient {
-			writeError(w, http.StatusForbidden, "only signed-in clients can create referral cases")
+			writeError(w, http.StatusForbidden, "only signed-in clients can create case requests")
 			return
 		}
 
@@ -57,8 +57,8 @@ func (s *Server) handleCases(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid json body")
 			return
 		}
-		if strings.TrimSpace(req.Title) == "" || req.LawyerID == 0 {
-			writeError(w, http.StatusBadRequest, "title and lawyerId are required")
+		if strings.TrimSpace(req.Summary) == "" || req.LawyerID == 0 {
+			writeError(w, http.StatusBadRequest, "lawyerId and issue summary are required")
 			return
 		}
 
@@ -140,6 +140,8 @@ func (s *Server) handleCaseRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleCaseMessages(w, r, caseID, current)
 	case "attachments":
 		s.handleCaseAttachments(w, r, caseID, current)
+	case "decision":
+		s.handleCaseDecision(w, r, caseID, current)
 	default:
 		writeError(w, http.StatusNotFound, "not found")
 	}
@@ -148,6 +150,16 @@ func (s *Server) handleCaseRoutes(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleCaseMessages(w http.ResponseWriter, r *http.Request, caseID int64, current *viewer) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	allowed, decisionStatus, err := s.store.CaseAllowsMessaging(r.Context(), caseID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !allowed {
+		writeError(w, http.StatusConflict, "messaging is available only after the lawyer accepts the case; current status: "+decisionStatus)
 		return
 	}
 
@@ -171,6 +183,16 @@ func (s *Server) handleCaseMessages(w http.ResponseWriter, r *http.Request, case
 func (s *Server) handleCaseAttachments(w http.ResponseWriter, r *http.Request, caseID int64, current *viewer) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	allowed, decisionStatus, err := s.store.CaseAllowsMessaging(r.Context(), caseID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !allowed {
+		writeError(w, http.StatusConflict, "file uploads are available only after the lawyer accepts the case; current status: "+decisionStatus)
 		return
 	}
 
@@ -202,6 +224,39 @@ func (s *Server) handleCaseAttachments(w http.ResponseWriter, r *http.Request, c
 	}
 
 	writeJSON(w, http.StatusCreated, message)
+}
+
+func (s *Server) handleCaseDecision(w http.ResponseWriter, r *http.Request, caseID int64, current *viewer) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if current.Role != models.RoleLawyer {
+		writeError(w, http.StatusForbidden, "only lawyers can accept or decline cases")
+		return
+	}
+
+	var req models.CaseDecisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+
+	details, err := s.store.DecideCase(r.Context(), caseID, current.Name, req)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "case not found")
+			return
+		}
+		if strings.Contains(err.Error(), "already") || strings.Contains(err.Error(), "decision must") {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, details)
 }
 
 func senderIdentity(current *viewer) (string, string) {
