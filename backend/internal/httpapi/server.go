@@ -23,6 +23,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/auth/login", s.handleLogin)
 	mux.HandleFunc("/api/auth/signup", s.handleSignup)
 	mux.HandleFunc("/api/auth/guest", s.handleGuest)
+	mux.HandleFunc("/api/admin/lawyers", s.handleAdminLawyers)
 	mux.HandleFunc("/api/dashboard", s.handleDashboard)
 	mux.HandleFunc("/api/cases", s.handleCases)
 	mux.HandleFunc("/api/cases/", s.handleCaseRoutes)

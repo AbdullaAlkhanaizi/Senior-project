@@ -6,6 +6,7 @@ import { API_BASE, createCase, getDashboard, sendCaseMessage, uploadCaseAttachme
 import { loadSession } from "../lib/session";
 
 export default function MessagingClient() {
+  const [session, setSession] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [selectedLawyerId, setSelectedLawyerId] = useState(1);
   const [messageInput, setMessageInput] = useState("");
@@ -17,9 +18,10 @@ export default function MessagingClient() {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    const session = loadSession();
-    if (session?.name) {
-      setClientName(session.name);
+    const currentSession = loadSession();
+    setSession(currentSession);
+    if (currentSession?.name) {
+      setClientName(currentSession.name);
     }
   }, []);
 
@@ -39,12 +41,23 @@ export default function MessagingClient() {
     load();
   }, []);
 
+  const role = session?.role || "guest";
+  const isAdmin = role === "admin";
+  const isGuest = role === "guest";
+  const isClient = role === "client";
+  const isLawyer = role === "lawyer";
+
   const selectedLawyer = useMemo(() => {
     return dashboard?.lawyers?.find((lawyer) => lawyer.id === Number(selectedLawyerId));
   }, [dashboard, selectedLawyerId]);
 
   async function handleCaseCreate(event) {
     event.preventDefault();
+    if (!isClient) {
+      setError("Only signed-in client accounts can create referral cases.");
+      return;
+    }
+
     setStatus("Creating referral...");
     setError("");
 
@@ -57,7 +70,7 @@ export default function MessagingClient() {
       });
 
       setDashboard((current) => ({
-        ...current,
+        ...(current || {}),
         activeCase: data
       }));
       setStatus(`Referral created with ${data.lawyer.name}.`);
@@ -78,13 +91,11 @@ export default function MessagingClient() {
 
     try {
       const data = await sendCaseMessage(dashboard.activeCase.case.id, {
-        senderType: "client",
-        senderName: clientName,
         body: messageInput
       });
 
       setDashboard((current) => ({
-        ...current,
+        ...(current || {}),
         activeCase: {
           ...current.activeCase,
           messages: [...current.activeCase.messages, data]
@@ -111,13 +122,11 @@ export default function MessagingClient() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("senderType", "client");
-      formData.append("senderName", clientName);
       formData.append("message", `Uploaded file: ${file.name}`);
 
       const data = await uploadCaseAttachment(dashboard.activeCase.case.id, formData);
       setDashboard((current) => ({
-        ...current,
+        ...(current || {}),
         activeCase: {
           ...current.activeCase,
           messages: [...current.activeCase.messages, data]
@@ -133,6 +142,24 @@ export default function MessagingClient() {
     }
   }
 
+  if (isAdmin) {
+    return (
+      <section className="grid lower-grid">
+        <article className="panel access-panel">
+          <div className="panel-header">
+            <div>
+              <p className="panel-kicker">Access blocked</p>
+              <h2>Admin accounts cannot open message threads</h2>
+            </div>
+          </div>
+          <p className="hero-copy">
+            This workspace is reserved for the client and the assigned lawyer. Admin accounts can still create lawyer profiles from the home dashboard.
+          </p>
+        </article>
+      </section>
+    );
+  }
+
   return (
     <>
       {error ? <p className="feedback error">{error}</p> : null}
@@ -142,8 +169,8 @@ export default function MessagingClient() {
         <div className="panel referral-panel">
           <div className="panel-header">
             <div>
-              <p className="panel-kicker">Part 2</p>
-              <h2>Lawyer referral</h2>
+              <p className="panel-kicker">{isLawyer ? "Assigned counsel" : "Part 2"}</p>
+              <h2>{isLawyer ? "Your lawyer profile" : "Lawyer referral"}</h2>
             </div>
           </div>
 
@@ -154,6 +181,7 @@ export default function MessagingClient() {
                 type="button"
                 className={`lawyer-card ${Number(selectedLawyerId) === lawyer.id ? "selected" : ""}`}
                 onClick={() => setSelectedLawyerId(lawyer.id)}
+                disabled={isLawyer}
               >
                 <strong>{lawyer.name}</strong>
                 <span>{lawyer.firm}</span>
@@ -172,22 +200,30 @@ export default function MessagingClient() {
             </div>
           ) : null}
 
-          <form className="referral-form" onSubmit={handleCaseCreate}>
-            <input value={clientName} onChange={(event) => setClientName(event.target.value)} placeholder="Client name" />
-            <input value={caseTitle} onChange={(event) => setCaseTitle(event.target.value)} placeholder="Case title" />
-            <textarea
-              value={caseSummary}
-              onChange={(event) => setCaseSummary(event.target.value)}
-              placeholder="Short referral summary"
-            />
-            <button type="submit">Create referral case</button>
-          </form>
+          {isClient ? (
+            <form className="referral-form" onSubmit={handleCaseCreate}>
+              <input value={clientName} onChange={(event) => setClientName(event.target.value)} placeholder="Client name" />
+              <input value={caseTitle} onChange={(event) => setCaseTitle(event.target.value)} placeholder="Case title" />
+              <textarea
+                value={caseSummary}
+                onChange={(event) => setCaseSummary(event.target.value)}
+                placeholder="Short referral summary"
+              />
+              <button type="submit">Create referral case</button>
+            </form>
+          ) : (
+            <p className="hero-copy">
+              {isGuest
+                ? "Guest mode can preview the lawyer directory, but referral creation requires a signed-in client account."
+                : "Lawyer accounts receive assigned cases here and can continue protected communication inside the thread on the right."}
+            </p>
+          )}
         </div>
 
         <div className="panel messaging-panel">
           <div className="panel-header">
             <div>
-              <p className="panel-kicker">Client workspace</p>
+              <p className="panel-kicker">{isLawyer ? "Lawyer workspace" : "Client workspace"}</p>
               <h2>Messaging and case progress</h2>
             </div>
             <span className="badge">{dashboard?.activeCase?.case?.status || "No case loaded"}</span>
@@ -236,23 +272,33 @@ export default function MessagingClient() {
                 ))}
               </div>
 
-              <form className="message-form" onSubmit={handleMessageSend}>
-                <textarea
-                  value={messageInput}
-                  onChange={(event) => setMessageInput(event.target.value)}
-                  placeholder="Send a message to the lawyer or law firm"
-                />
-                <div className="message-actions">
-                  <label className={`upload-button ${uploading ? "disabled" : ""}`}>
-                    <input type="file" onChange={handleUpload} disabled={uploading} />
-                    Upload file
-                  </label>
-                  <button type="submit">Send message</button>
-                </div>
-              </form>
+              {!isGuest ? (
+                <form className="message-form" onSubmit={handleMessageSend}>
+                  <textarea
+                    value={messageInput}
+                    onChange={(event) => setMessageInput(event.target.value)}
+                    placeholder={isLawyer ? "Send an update to your client" : "Send a message to your lawyer"}
+                  />
+                  <div className="message-actions">
+                    <label className={`upload-button ${uploading ? "disabled" : ""}`}>
+                      <input type="file" onChange={handleUpload} disabled={uploading} />
+                      Upload file
+                    </label>
+                    <button type="submit">Send message</button>
+                  </div>
+                </form>
+              ) : (
+                <p className="hero-copy">
+                  Guest mode does not allow protected messages or file uploads. Sign in as a client to continue.
+                </p>
+              )}
             </>
           ) : (
-            <p className="muted">No case has been loaded from the backend yet.</p>
+            <p className="muted">
+              {isLawyer
+                ? "No case has been assigned to this lawyer account yet."
+                : "No case has been loaded for this account yet."}
+            </p>
           )}
         </div>
       </section>

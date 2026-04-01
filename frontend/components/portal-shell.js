@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+
+import { clearSession, loadSession } from "../lib/session";
 
 const SearchIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8a837c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -11,17 +13,39 @@ const SearchIcon = () => (
   </svg>
 );
 
+const ROLE_LABELS = {
+  admin: "Admin",
+  lawyer: "Lawyer",
+  client: "Client",
+  guest: "Guest"
+};
+
 export default function PortalShell({ title, description, hideHero, children }) {
   const pathname = usePathname() || "";
+  const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [session, setSession] = useState(null);
+
+  useEffect(() => {
+    setSession(loadSession());
+  }, [pathname]);
 
   const handleSearchToggle = () => {
     setSearchOpen(!searchOpen);
     if (!searchOpen) {
-      setTimeout(() => document.getElementById('navbar-search')?.focus(), 100);
+      setTimeout(() => document.getElementById("navbar-search")?.focus(), 100);
     }
   };
+
+  const handleLogout = () => {
+    clearSession();
+    setSession(null);
+    router.push("/");
+  };
+
+  const role = session?.role || "guest";
+  const showMessaging = role !== "admin";
 
   return (
     <div className="portal-layout">
@@ -35,45 +59,62 @@ export default function PortalShell({ title, description, hideHero, children }) 
               <Link href="/home" className={pathname === "/home" ? "active" : ""}>Home</Link>
               <Link href="/ai" className={pathname === "/ai" ? "active" : ""}>AI</Link>
               <Link href="/faq" className={pathname === "/faq" ? "active" : ""}>FAQ</Link>
-              <Link href="/messaging" className={pathname === "/messaging" ? "active" : ""}>Messaging</Link>
+              {showMessaging ? (
+                <Link href="/messaging" className={pathname === "/messaging" ? "active" : ""}>Messaging</Link>
+              ) : null}
               <Link href="/labor" className={pathname === "/labor" ? "active" : ""}>Labor Calculator</Link>
             </nav>
             <div className="portal-divider"></div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
-              <input 
+            <div className="portal-account-strip">
+              <div className="portal-account-meta">
+                <span className="portal-role-badge">{ROLE_LABELS[role] || "Account"}</span>
+                <strong>{session?.name || "Explorer"}</strong>
+              </div>
+              {session?.token ? (
+                <button type="button" className="portal-logout-btn" onClick={handleLogout}>
+                  Log out
+                </button>
+              ) : (
+                <Link href="/" className="portal-login-link">
+                  Sign in
+                </Link>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", position: "relative" }}>
+              <input
                 id="navbar-search"
-                type="text" 
+                type="text"
                 autoComplete="off"
-                className={`portal-search-input ${searchOpen ? 'open' : ''}`}
+                className={`portal-search-input ${searchOpen ? "open" : ""}`}
                 style={{
-                  width: searchOpen ? '260px' : '0',
+                  width: searchOpen ? "260px" : "0",
                   opacity: searchOpen ? 1 : 0,
-                  pointerEvents: searchOpen ? 'auto' : 'none',
-                  padding: searchOpen ? '10px 18px' : '10px 0',
-                  visibility: searchOpen ? 'visible' : 'hidden',
-                  marginRight: searchOpen ? '8px' : '0'
+                  pointerEvents: searchOpen ? "auto" : "none",
+                  padding: searchOpen ? "10px 18px" : "10px 0",
+                  visibility: searchOpen ? "visible" : "hidden",
+                  marginRight: searchOpen ? "8px" : "0"
                 }}
                 placeholder="Search resources, cases..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(event) => setSearchQuery(event.target.value)}
               />
-              <button 
+              <button
                 type="button"
-                className="portal-search-btn" 
+                className="portal-search-btn"
                 aria-label="Search"
                 onClick={handleSearchToggle}
                 style={{
-                  background: 'white',
-                  borderRadius: '50%',
-                  width: '42px',
-                  height: '42px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                  border: '1px solid rgba(0,0,0,0.06)',
-                  cursor: 'pointer',
-                  transition: 'transform 0.2s',
+                  background: "white",
+                  borderRadius: "50%",
+                  width: "42px",
+                  height: "42px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+                  border: "1px solid rgba(0,0,0,0.06)",
+                  cursor: "pointer",
+                  transition: "transform 0.2s",
                   flexShrink: 0
                 }}
               >

@@ -7,6 +7,13 @@ export function saveSession(session) {
   window.localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
+export function clearSession() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.removeItem(SESSION_KEY);
+}
+
 export function loadSession() {
   if (typeof window === "undefined") {
     return null;

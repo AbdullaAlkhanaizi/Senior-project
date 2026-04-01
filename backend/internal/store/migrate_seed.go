@@ -2,13 +2,16 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
 	"senior-project/backend/internal/models"
 )
 
-const timeLayout = time.RFC3339
+const seededLawyerPassword = "Lawyer123!"
+const seededClientEmail = "client@legal-portal.local"
+const seededClientPassword = "Client123!"
 
 func (s *Store) Migrate(ctx context.Context) error {
 	if err := os.MkdirAll(s.uploadDir, 0o755); err != nil {
@@ -21,17 +24,21 @@ func (s *Store) Migrate(ctx context.Context) error {
 			name TEXT NOT NULL,
 			email TEXT NOT NULL UNIQUE,
 			password_hash TEXT NOT NULL,
+			role TEXT NOT NULL DEFAULT 'client',
 			created_at TEXT NOT NULL
 		);`,
 		`CREATE TABLE IF NOT EXISTS lawyers (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER UNIQUE,
 			name TEXT NOT NULL,
 			firm TEXT NOT NULL,
 			specialty TEXT NOT NULL,
 			city TEXT NOT NULL,
 			email TEXT NOT NULL,
 			phone TEXT NOT NULL,
-			bio TEXT NOT NULL
+			bio TEXT NOT NULL,
+			created_at TEXT NOT NULL,
+			FOREIGN KEY (user_id) REFERENCES users(id)
 		);`,
 		`CREATE TABLE IF NOT EXISTS cases (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,8 +47,10 @@ func (s *Store) Migrate(ctx context.Context) error {
 			status TEXT NOT NULL,
 			progress_percent INTEGER NOT NULL,
 			client_name TEXT NOT NULL,
+			client_user_id INTEGER,
 			lawyer_id INTEGER NOT NULL,
 			created_at TEXT NOT NULL,
+			FOREIGN KEY (client_user_id) REFERENCES users(id),
 			FOREIGN KEY (lawyer_id) REFERENCES lawyers(id)
 		);`,
 		`CREATE TABLE IF NOT EXISTS case_updates (
@@ -78,10 +87,110 @@ func (s *Store) Migrate(ctx context.Context) error {
 		}
 	}
 
+	if err := s.ensureColumn(ctx, "users", "role", "TEXT NOT NULL DEFAULT 'client'"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn(ctx, "lawyers", "user_id", "INTEGER"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn(ctx, "lawyers", "created_at", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn(ctx, "cases", "client_user_id", "INTEGER"); err != nil {
+		return err
+	}
+
+	indexStatements := []string{
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_lawyers_user_id ON lawyers(user_id) WHERE user_id IS NOT NULL;`,
+		`CREATE INDEX IF NOT EXISTS idx_cases_client_user_id ON cases(client_user_id);`,
+	}
+
+	for _, statement := range indexStatements {
+		if _, err := s.db.ExecContext(ctx, statement); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 func (s *Store) Seed(ctx context.Context) error {
+	if _, err := s.EnsureUserAccount(ctx, s.adminName, s.adminEmail, s.adminPassword, models.RoleAdmin); err != nil {
+		return err
+	}
+
+	sampleClient, err := s.EnsureUserAccount(ctx, "Sample Client", seededClientEmail, seededClientPassword, models.RoleClient)
+	if err != nil {
+		return err
+	}
+
+	if err := s.seedLawyers(ctx); err != nil {
+		return err
+	}
+	if err := s.seedSampleCase(ctx, sampleClient); err != nil {
+		return err
+	}
+	if err := s.seedFAQs(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Store) seedLawyers(ctx context.Context) error {
+	existingRows, err := s.db.QueryContext(ctx, `
+		SELECT id, name, email, COALESCE(user_id, 0), firm, specialty, city, phone, bio
+		FROM lawyers
+		ORDER BY id ASC`)
+	if err != nil {
+		return err
+	}
+	defer existingRows.Close()
+
+	type existingLawyer struct {
+		ID        int64
+		Name      string
+		Email     string
+		UserID    int64
+		Firm      string
+		Specialty string
+		City      string
+		Phone     string
+		Bio       string
+	}
+
+	var existing []existingLawyer
+	for existingRows.Next() {
+		var row existingLawyer
+		if err := existingRows.Scan(&row.ID, &row.Name, &row.Email, &row.UserID, &row.Firm, &row.Specialty, &row.City, &row.Phone, &row.Bio); err != nil {
+			return err
+		}
+		existing = append(existing, row)
+	}
+	if err := existingRows.Err(); err != nil {
+		return err
+	}
+
+	for _, row := range existing {
+		if row.UserID != 0 {
+			continue
+		}
+
+		account, err := s.EnsureUserAccount(ctx, row.Name, row.Email, seededLawyerPassword, models.RoleLawyer)
+		if err != nil {
+			return err
+		}
+
+		if _, err := s.db.ExecContext(ctx, `
+			UPDATE lawyers
+			SET user_id = ?
+			WHERE id = ?`,
+			account.ID, row.ID,
+		); err != nil {
+			return err
+		}
+	}
+
 	var lawyerCount int
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM lawyers`).Scan(&lawyerCount); err != nil {
 		return err
@@ -127,25 +236,53 @@ func (s *Store) Seed(ctx context.Context) error {
 	}
 
 	for _, lawyer := range lawyerSeeds {
+		account, err := ensureUserAccount(ctx, tx, lawyer.Name, lawyer.Email, seededLawyerPassword, models.RoleLawyer)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO lawyers (name, firm, specialty, city, email, phone, bio)
-			VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			lawyer.Name, lawyer.Firm, lawyer.Specialty, lawyer.City, lawyer.Email, lawyer.Phone, lawyer.Bio,
+			INSERT INTO lawyers (user_id, name, firm, specialty, city, email, phone, bio, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			account.ID, lawyer.Name, lawyer.Firm, lawyer.Specialty, lawyer.City, lawyer.Email, lawyer.Phone, lawyer.Bio, time.Now().UTC().Format(timeLayout),
 		); err != nil {
 			return err
 		}
 	}
 
+	return tx.Commit()
+}
+
+func (s *Store) seedSampleCase(ctx context.Context, sampleClient models.AuthResponse) error {
+	var caseCount int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM cases`).Scan(&caseCount); err != nil {
+		return err
+	}
+	if caseCount > 0 {
+		return nil
+	}
+
+	var lawyerID int64
+	if err := s.db.QueryRowContext(ctx, `SELECT id FROM lawyers ORDER BY id ASC LIMIT 1`).Scan(&lawyerID); err != nil {
+		return err
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	now := time.Now().UTC()
 	caseResult, err := tx.ExecContext(ctx, `
-		INSERT INTO cases (title, summary, status, progress_percent, client_name, lawyer_id, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO cases (title, summary, status, progress_percent, client_name, client_user_id, lawyer_id, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		"Traffic citation review",
 		"User asked whether a red-light violation requires court follow-up and uploaded the fine notice.",
 		"Review in progress",
 		55,
-		"Sample Client",
-		1,
+		sampleClient.Name,
+		sampleClient.ID,
+		lawyerID,
 		now.Format(timeLayout),
 	)
 	if err != nil {
@@ -182,7 +319,7 @@ func (s *Store) Seed(ctx context.Context) error {
 		{
 			CaseID:     caseID,
 			SenderType: "client",
-			SenderName: "Sample Client",
+			SenderName: sampleClient.Name,
 			Body:       "I received this traffic ticket and want to know whether I need to attend court.",
 			CreatedAt:  now.Format(timeLayout),
 		},
@@ -212,6 +349,18 @@ func (s *Store) Seed(ctx context.Context) error {
 		}
 	}
 
+	return tx.Commit()
+}
+
+func (s *Store) seedFAQs(ctx context.Context) error {
+	var faqCount int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM faq_suggestions`).Scan(&faqCount); err != nil {
+		return err
+	}
+	if faqCount > 0 {
+		return nil
+	}
+
 	faqSeeds := []models.FAQSuggestion{
 		{Question: "Is running a red light illegal?", Category: "Traffic", Priority: 1},
 		{Question: "What should I do after getting a store theft accusation?", Category: "Criminal", Priority: 2},
@@ -220,7 +369,7 @@ func (s *Store) Seed(ctx context.Context) error {
 	}
 
 	for _, faq := range faqSeeds {
-		if _, err := tx.ExecContext(ctx, `
+		if _, err := s.db.ExecContext(ctx, `
 			INSERT INTO faq_suggestions (question, category, priority)
 			VALUES (?, ?, ?)`,
 			faq.Question, faq.Category, faq.Priority,
@@ -229,5 +378,34 @@ func (s *Store) Seed(ctx context.Context) error {
 		}
 	}
 
-	return tx.Commit()
+	return nil
+}
+
+func (s *Store) ensureColumn(ctx context.Context, tableName, columnName, definition string) error {
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", tableName))
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name string
+		var columnType string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		if name == columnName {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	_, err = s.db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", tableName, columnName, definition))
+	return err
 }

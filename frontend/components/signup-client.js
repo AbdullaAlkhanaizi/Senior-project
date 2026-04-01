@@ -37,7 +37,7 @@ export default function SignupClient() {
           <p className="eyebrow">Account Setup</p>
           <h1>Create a client account</h1>
           <p className="hero-copy">
-            This page is separate now, so the main entry screen stays focused on login or guest access.
+            Clients can register here directly. Lawyer accounts are created by admins, and admin access stays private to the development team.
           </p>
         </div>
       </section>
@@ -49,23 +49,24 @@ export default function SignupClient() {
         <article className="panel">
           <div className="panel-header">
             <div>
-              <p className="panel-kicker">Sign Up</p>
-              <h2>New account</h2>
+              <p className="panel-kicker">Client Sign Up</p>
+              <h2>New client account</h2>
             </div>
           </div>
           <form className="referral-form" onSubmit={handleSignup}>
-            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Full name" />
-            <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email address" />
+            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Full name" required />
+            <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email address" type="email" required />
             <input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Password with at least 6 characters"
+              required
             />
             <button type="submit">Create account</button>
           </form>
           <p className="muted auth-copy">
-            Already registered? <Link href="/">Return to login</Link>.
+            Already registered? <Link href="/">Return to sign in</Link>.
           </p>
         </article>
       </section>

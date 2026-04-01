@@ -21,7 +21,7 @@ func main() {
 	}
 	defer db.Close()
 
-	dataStore := store.New(db, cfg.UploadDir)
+	dataStore := store.New(db, cfg.UploadDir, cfg.AdminName, cfg.AdminEmail, cfg.AdminPassword)
 	if err := dataStore.Migrate(ctx); err != nil {
 		log.Fatalf("migrate database: %v", err)
 	}

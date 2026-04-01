@@ -12,6 +12,16 @@ import (
 )
 
 func (s *Server) handleCases(w http.ResponseWriter, r *http.Request) {
+	current, err := s.requireViewer(r)
+	if err != nil {
+		status := http.StatusUnauthorized
+		if errors.Is(err, errForbidden) {
+			status = http.StatusForbidden
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		cases, err := s.store.ListCases(r.Context())
@@ -19,17 +29,41 @@ func (s *Server) handleCases(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		writeJSON(w, http.StatusOK, cases)
+
+		filtered := make([]models.CaseSummary, 0, len(cases))
+		for _, item := range cases {
+			if current.Role == models.RoleAdmin {
+				filtered = append(filtered, item)
+				continue
+			}
+			if current.Role == models.RoleLawyer && item.LawyerID == current.LawyerID {
+				filtered = append(filtered, item)
+				continue
+			}
+			if current.Role == models.RoleClient && item.ClientUserID == current.ID {
+				filtered = append(filtered, item)
+			}
+		}
+
+		writeJSON(w, http.StatusOK, filtered)
 	case http.MethodPost:
+		if current.Role != models.RoleClient {
+			writeError(w, http.StatusForbidden, "only signed-in clients can create referral cases")
+			return
+		}
+
 		var req models.CreateCaseRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid json body")
 			return
 		}
-		if strings.TrimSpace(req.Title) == "" || req.LawyerID == 0 || strings.TrimSpace(req.ClientName) == "" {
-			writeError(w, http.StatusBadRequest, "title, clientName and lawyerId are required")
+		if strings.TrimSpace(req.Title) == "" || req.LawyerID == 0 {
+			writeError(w, http.StatusBadRequest, "title and lawyerId are required")
 			return
 		}
+
+		req.ClientUserID = current.ID
+		req.ClientName = defaultString(req.ClientName, current.Name)
 
 		details, err := s.store.CreateCase(r.Context(), req)
 		if err != nil {
@@ -43,6 +77,16 @@ func (s *Server) handleCases(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleCaseRoutes(w http.ResponseWriter, r *http.Request) {
+	current, err := s.requireViewer(r)
+	if err != nil {
+		status := http.StatusUnauthorized
+		if errors.Is(err, errForbidden) {
+			status = http.StatusForbidden
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+
 	path := strings.TrimPrefix(r.URL.Path, "/api/cases/")
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) == 0 || parts[0] == "" {
@@ -53,6 +97,21 @@ func (s *Server) handleCaseRoutes(w http.ResponseWriter, r *http.Request) {
 	caseID, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid case id")
+		return
+	}
+
+	if current.Role == models.RoleAdmin {
+		writeError(w, http.StatusForbidden, "admins cannot access client-lawyer message threads")
+		return
+	}
+
+	allowed, err := s.store.CanAccessCase(r.Context(), caseID, current.Role, current.ID, current.LawyerID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !allowed {
+		writeError(w, http.StatusForbidden, "you do not have access to this case")
 		return
 	}
 
@@ -78,15 +137,15 @@ func (s *Server) handleCaseRoutes(w http.ResponseWriter, r *http.Request) {
 
 	switch parts[1] {
 	case "messages":
-		s.handleCaseMessages(w, r, caseID)
+		s.handleCaseMessages(w, r, caseID, current)
 	case "attachments":
-		s.handleCaseAttachments(w, r, caseID)
+		s.handleCaseAttachments(w, r, caseID, current)
 	default:
 		writeError(w, http.StatusNotFound, "not found")
 	}
 }
 
-func (s *Server) handleCaseMessages(w http.ResponseWriter, r *http.Request, caseID int64) {
+func (s *Server) handleCaseMessages(w http.ResponseWriter, r *http.Request, caseID int64, current *viewer) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
@@ -98,6 +157,8 @@ func (s *Server) handleCaseMessages(w http.ResponseWriter, r *http.Request, case
 		return
 	}
 
+	req.SenderType, req.SenderName = senderIdentity(current)
+
 	message, err := s.store.CreateMessage(r.Context(), caseID, req)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -107,7 +168,7 @@ func (s *Server) handleCaseMessages(w http.ResponseWriter, r *http.Request, case
 	writeJSON(w, http.StatusCreated, message)
 }
 
-func (s *Server) handleCaseAttachments(w http.ResponseWriter, r *http.Request, caseID int64) {
+func (s *Server) handleCaseAttachments(w http.ResponseWriter, r *http.Request, caseID int64, current *viewer) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
@@ -125,11 +186,12 @@ func (s *Server) handleCaseAttachments(w http.ResponseWriter, r *http.Request, c
 	}
 	defer file.Close()
 
+	senderType, senderName := senderIdentity(current)
 	message, err := s.store.CreateAttachmentMessage(
 		r.Context(),
 		caseID,
-		r.FormValue("senderType"),
-		r.FormValue("senderName"),
+		senderType,
+		senderName,
 		r.FormValue("message"),
 		header,
 		file,
@@ -140,4 +202,21 @@ func (s *Server) handleCaseAttachments(w http.ResponseWriter, r *http.Request, c
 	}
 
 	writeJSON(w, http.StatusCreated, message)
+}
+
+func senderIdentity(current *viewer) (string, string) {
+	if current == nil {
+		return "client", "Client"
+	}
+	if current.Role == models.RoleLawyer {
+		return "lawyer", current.Name
+	}
+	return "client", current.Name
+}
+
+func defaultString(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(value)
 }

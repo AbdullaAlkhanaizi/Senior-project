@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 
 	"senior-project/backend/internal/models"
@@ -9,6 +10,16 @@ import (
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	current, err := s.viewerFromRequest(r)
+	if err != nil {
+		status := http.StatusUnauthorized
+		if errors.Is(err, errForbidden) {
+			status = http.StatusForbidden
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 
@@ -24,7 +35,16 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	activeCase, err := s.store.LoadCaseDetails(r.Context(), 1)
+	role := models.RoleGuest
+	var userID int64
+	var lawyerID int64
+	if current != nil {
+		role = current.Role
+		userID = current.ID
+		lawyerID = current.LawyerID
+	}
+
+	activeCase, err := s.store.LoadPrimaryCaseForViewer(r.Context(), role, userID, lawyerID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

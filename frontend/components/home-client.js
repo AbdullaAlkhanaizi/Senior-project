@@ -2,261 +2,278 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+
+import { createLawyerAccount, getDashboard } from "../lib/api";
 import { loadSession } from "../lib/session";
 
-const RobotIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#b6603e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="5" y="8" width="14" height="10" rx="3" />
-    <path d="M12 2v6M9 2h6M16 13h.01M8 13h.01M9 18v2M15 18v2" />
-    <path d="M12 11v2" />
-  </svg>
-);
+const ROLE_TITLES = {
+  admin: "Admin workspace",
+  lawyer: "Lawyer workspace",
+  client: "Client workspace",
+  guest: "Guest preview"
+};
 
-const DotsIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" style={{ margin: 'auto' }}>
-    <circle cx="5" cy="12" r="2.5" fill="#8c7e75" />
-    <circle cx="12" cy="12" r="2.5" fill="#8c7e75" />
-    <circle cx="19" cy="12" r="2.5" fill="#8c7e75" />
-  </svg>
-);
+const ROLE_COPY = {
+  admin: "Create lawyer accounts, review platform data, and manage access. Admins do not have access to client-lawyer message threads.",
+  lawyer: "Review your assigned matters and continue case communication from the protected messaging workspace.",
+  client: "Track your case, contact your lawyer, and create a new referral when the AI assistant escalates your issue.",
+  guest: "Browse the platform before registering. Referral creation and protected messaging require a client account."
+};
 
-const ChevronRight = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 18l6-6-6-6" />
-  </svg>
-);
-
-const MessageIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-  </svg>
-);
-
-const DocumentIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="16" y1="13" x2="8" y2="13" />
-    <line x1="16" y1="17" x2="8" y2="17" />
-    <polyline points="10 9 9 9 8 9" />
-  </svg>
-);
-
-const FaqIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#b6603e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-    <path d="M12 8v4" />
-    <circle cx="12" cy="16" r="0.5" fill="#b6603e" />
-  </svg>
-);
-
-const DocOutlineIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#b6603e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="16" y1="13" x2="8" y2="13" />
-    <line x1="16" y1="17" x2="8" y2="17" />
-    <polyline points="10 9 9 9 8 9" />
-  </svg>
-);
-
-const MessagingOutlineIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#b6603e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-  </svg>
-);
+const INITIAL_LAWYER_FORM = {
+  name: "",
+  email: "",
+  password: "",
+  firm: "",
+  specialty: "",
+  city: "",
+  phone: "",
+  bio: ""
+};
 
 export default function HomeClient() {
   const [session, setSession] = useState(null);
+  const [dashboard, setDashboard] = useState(null);
+  const [lawyerForm, setLawyerForm] = useState(INITIAL_LAWYER_FORM);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    setSession(loadSession());
+    const currentSession = loadSession();
+    setSession(currentSession);
+
+    async function load() {
+      try {
+        const data = await getDashboard();
+        setDashboard(data);
+      } catch (requestError) {
+        setError(requestError.message);
+      }
+    }
+
+    load();
   }, []);
 
+  const role = session?.role || "guest";
+  const activeCase = dashboard?.activeCase;
+  const lawyers = dashboard?.lawyers || [];
+
+  async function handleCreateLawyer(event) {
+    event.preventDefault();
+    setError("");
+    setStatus("Creating lawyer account...");
+
+    try {
+      const lawyer = await createLawyerAccount(lawyerForm);
+      setDashboard((current) => ({
+        ...(current || {}),
+        lawyers: [...(current?.lawyers || []), lawyer]
+      }));
+      setLawyerForm(INITIAL_LAWYER_FORM);
+      setStatus(`${lawyer.name} can now sign in with the lawyer role.`);
+    } catch (requestError) {
+      setError(requestError.message);
+      setStatus("");
+    }
+  }
+
+  function updateLawyerForm(field, value) {
+    setLawyerForm((current) => ({
+      ...current,
+      [field]: value
+    }));
+  }
+
   return (
-    <div className="dash-container">
-      <div className="dash-top">
-        <div className="dash-left-panel">
-          <div className="hero-text">
-            <h1>Manage legal tasks<br/>in one place</h1>
-            <p>Streamline documents, tasks, and client communication from<br/>one central hub.</p>
-            <div className="hero-actions">
-              <Link href="/ai" className="btn-primary">Get Started with AI Assistant</Link>
-              <Link href="/faq" className="btn-secondary">Browse FAQs</Link>
+    <>
+      {error ? <p className="feedback error">{error}</p> : null}
+      {status ? <p className="feedback">{status}</p> : null}
+
+      <section className="hub-grid">
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="panel-kicker">Signed in as</p>
+              <h2>{ROLE_TITLES[role] || "Workspace"}</h2>
+            </div>
+            <span className="badge">{role}</span>
+          </div>
+
+          <p className="hero-copy">{ROLE_COPY[role] || ROLE_COPY.guest}</p>
+
+          <div className="account-summary">
+            <div>
+              <span className="summary-label">Account</span>
+              <strong>{session?.name || "Guest explorer"}</strong>
+            </div>
+            <div>
+              <span className="summary-label">Email</span>
+              <strong>{session?.email || "No saved account"}</strong>
             </div>
           </div>
 
-          <div className="recent-activity-section">
-            <h2 className="section-title">Recent Activity</h2>
-            <div className="activity-card shadow-sm">
-              <Link href="/messaging" className="activity-item">
-                <div className="activity-icon bg-brown">
-                  <MessageIcon />
-                </div>
-                <div className="activity-info">
-                  <div className="activity-title">Message: <strong>John Smith</strong></div>
-                  <div className="activity-meta">Last activity: <span>2 hours ago</span></div>
-                </div>
-                <ChevronRight />
+          <div className="hub-cards">
+            <Link href="/ai" className="feature-card">
+              <span>Assistant</span>
+              <h3>Ask the AI legal assistant</h3>
+              <p>Start triage, draft questions, and prepare for escalation.</p>
+            </Link>
+
+            <Link href="/faq" className="feature-card">
+              <span>Knowledge Base</span>
+              <h3>Browse legal FAQs</h3>
+              <p>Explore the frequently asked questions already surfaced by the system.</p>
+            </Link>
+
+            {role !== "admin" ? (
+              <Link href="/messaging" className="feature-card">
+                <span>Protected Thread</span>
+                <h3>Open the messaging workspace</h3>
+                <p>View case progress, file uploads, and direct lawyer communication.</p>
               </Link>
-              <div className="activity-divider"></div>
-              <Link href="/docs" className="activity-item">
-                <div className="activity-icon bg-tan">
-                  <DocumentIcon />
-                </div>
-                <div className="activity-info">
-                  <div className="activity-title">Document: <strong>Partnership Agreement</strong></div>
-                  <div className="activity-meta">Touched: <span>Yesterday</span></div>
-                </div>
-                <ChevronRight />
+            ) : (
+              <article className="feature-card static-card">
+                <span>Access Boundary</span>
+                <h3>Admin message access is blocked</h3>
+                <p>Client-lawyer threads stay unavailable to admin accounts by design.</p>
+              </article>
+            )}
+
+            {role === "guest" ? (
+              <Link href="/signup" className="feature-card">
+                <span>Registration</span>
+                <h3>Create a client account</h3>
+                <p>Only clients self-register. Lawyer accounts are created by admins.</p>
               </Link>
-            </div>
+            ) : null}
           </div>
-        </div>
+        </article>
 
-        <div className="dash-right-panel">
-          <div className="glass-backing-plate">
-            <div className="glass-card big-ai-card shadow-lg">
-              <div className="card-header">
-                <div className="header-title">
-                  <RobotIcon /> AI Assistant
-                </div>
-                <div className="header-dots-new">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#aab8c2' }}>
-                    <circle cx="5" cy="12" r="2.2" />
-                    <circle cx="12" cy="12" r="2.2" />
-                    <circle cx="19" cy="12" r="2.2" />
-                  </svg>
+        <article className="panel">
+          {role === "admin" ? (
+            <>
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">Admin Only</p>
+                  <h2>Create lawyer account</h2>
                 </div>
               </div>
-              <div className="card-body">
-                <p className="card-desc">Ask legal questions and get<br/>real-time answers powered by AI.</p>
-                
-                <div className="chat-prompts">
-                  <button className="prompt-btn">
-                    <span>Create a non-disclosure agreement</span>
-                    <ChevronRight />
-                  </button>
-                  <button className="prompt-btn">
-                    <span>Explain the process to file a trademark</span>
-                    <ChevronRight />
-                  </button>
-                  <button className="prompt-btn">
-                    <span>Find a divorce lawyer near me</span>
-                    <ChevronRight />
-                  </button>
+
+              <form className="referral-form admin-form-grid" onSubmit={handleCreateLawyer}>
+                <input value={lawyerForm.name} onChange={(event) => updateLawyerForm("name", event.target.value)} placeholder="Lawyer name" />
+                <input value={lawyerForm.email} onChange={(event) => updateLawyerForm("email", event.target.value)} placeholder="Lawyer email" />
+                <input value={lawyerForm.password} onChange={(event) => updateLawyerForm("password", event.target.value)} placeholder="Temporary password" type="password" />
+                <input value={lawyerForm.firm} onChange={(event) => updateLawyerForm("firm", event.target.value)} placeholder="Firm name" />
+                <input value={lawyerForm.specialty} onChange={(event) => updateLawyerForm("specialty", event.target.value)} placeholder="Specialty" />
+                <input value={lawyerForm.city} onChange={(event) => updateLawyerForm("city", event.target.value)} placeholder="City" />
+                <input value={lawyerForm.phone} onChange={(event) => updateLawyerForm("phone", event.target.value)} placeholder="Phone" />
+                <textarea value={lawyerForm.bio} onChange={(event) => updateLawyerForm("bio", event.target.value)} placeholder="Short lawyer bio" />
+                <button type="submit">Create lawyer account</button>
+              </form>
+            </>
+          ) : activeCase ? (
+            <>
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">Current case</p>
+                  <h2>{activeCase.case.title}</h2>
                 </div>
+                <span className="badge">{activeCase.case.status}</span>
+              </div>
 
-                <div className="card-action">
-                  <Link href="/ai" className="btn-primary">Open Assistant</Link>
+              <div className="progress-card">
+                <div className="progress-meta">
+                  <div>
+                    <p className="muted">Assigned lawyer</p>
+                    <h3>{activeCase.lawyer.name}</h3>
+                  </div>
+                  <strong>{activeCase.case.progressPercent}%</strong>
+                </div>
+                <div className="progress-bar">
+                  <div style={{ width: `${activeCase.case.progressPercent}%` }} />
+                </div>
+                <div className="timeline">
+                  {activeCase.updates.map((step) => (
+                    <article key={step.id} className={`timeline-step ${step.state}`}>
+                      <span />
+                      <div>
+                        <h4>{step.label}</h4>
+                        <p>{step.state}</p>
+                      </div>
+                    </article>
+                  ))}
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="dash-bottom-row">
-        <div className="small-card calc-card shadow-sm">
-          <div className="calc-header">
-            <div className="calc-title">
-              <div className="calc-icon-wrapper">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d26038" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 13L20 7c.6-.6 1.6-.6 2.2 0 .6.6.6 1.6 0 2.2L16 15" />
-                  <path d="M11.5 12.5a3.5 3.5 0 0 1-5 0 3.5 3.5 0 0 1 0-5 3.5 3.5 0 0 1 5 0 3.5 3.5 0 0 1 0 5z" />
-                  <path d="M5.5 15.5L2 19" />
-                </svg>
+              <div className="status-row">
+                <Link href="/messaging" className="link-button">Open messaging</Link>
+                <Link href="/faq" className="link-button ghost">Browse FAQs</Link>
               </div>
-              <span>Labour Cost Calculator</span>
-            </div>
-            <div className="calc-total">BHD 21,733<span>/mo</span></div>
-          </div>
-          
-          <div className="calc-rows">
-            <div className="calc-row">
-              <span className="c-icon">
-                <svg width="16" height="16" viewBox="0 0 21 15" fill="none">
-                  <mask id="bh-mask">
-                    <rect width="21" height="15" fill="white" rx="2"/>
-                  </mask>
-                  <g mask="url(#bh-mask)">
-                    <rect width="21" height="15" fill="#CE1126" />
-                    <path d="M0 0h6l2 1.5L6 3l2 1.5L6 6l2 1.5L6 9l2 1.5L6 12l2 1.5L6 15H0V0z" fill="white"/>
-                  </g>
-                </svg>
-              </span>
-              <span className="c-label">BH</span>
-              <span className="c-val">BHD 20 <small>/hrs</small></span>
-              <div className="c-bar-bg"><div className="c-bar-fill fill-1" style={{width: '90%'}}></div></div>
-            </div>
-            <div className="calc-row">
-              <span className="c-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a09a95" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <polyline points="12 6 12 12 16 14"/>
-                </svg>
-              </span>
-              <span className="c-label">40</span>
-              <span className="c-val">hours</span>
-              <div className="c-bar-bg"><div className="c-bar-fill fill-2" style={{width: '25%'}}></div></div>
-            </div>
-            <div className="calc-row">
-              <span className="c-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a09a95" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-                </svg>
-              </span>
-              <span className="c-label">5</span>
-              <span className="c-val">employees</span>
-              <div className="c-bar-bg"><div className="c-bar-fill fill-3" style={{width: '12%'}}></div></div>
-            </div>
-          </div>
-        </div>
-
-        <div className="small-card shadow-sm">
-          <div className="card-header" style={{ marginBottom: '12px' }}>
-            <div className="header-title" style={{ fontSize: '1rem' }}>
-              <MessagingOutlineIcon /> Messaging
-            </div>
-            <div className="header-dots-new">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#aab8c2' }}>
-                <circle cx="5" cy="12" r="1.8" />
-                <circle cx="12" cy="12" r="1.8" />
-                <circle cx="19" cy="12" r="1.8" />
-              </svg>
-            </div>
-          </div>
-          <div className="card-body-compact">
-            <div className="msg-content">
-              <div className="msg-text">
-                <strong>2 New Messages</strong>
-                <p>(e.g., John S., Alice M.)</p>
+            </>
+          ) : (
+            <>
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">Next step</p>
+                  <h2>No protected case yet</h2>
+                </div>
               </div>
-              <div className="msg-badge">1</div>
-            </div>
-          </div>
-          <div className="sm-action">
-            <Link href="/faq" className="btn-secondary sm-btn">Browse FAQs</Link>
-          </div>
-        </div>
 
-        <div className="small-card template-card shadow-sm">
-          <div className="card-header" style={{ marginBottom: '12px' }}>
-            <div className="header-title" style={{ fontSize: '1rem' }}>
-              <DocOutlineIcon /> Document Templates
+              <p className="hero-copy">
+                {role === "guest"
+                  ? "You can preview the platform, but creating a referral or joining a protected case requires a client account."
+                  : "Your account is ready. When you start a referral, the system will attach the case to your signed-in role automatically."}
+              </p>
+
+              <div className="status-row">
+                {role === "guest" ? (
+                  <Link href="/signup" className="link-button">Create client account</Link>
+                ) : (
+                  <Link href="/messaging" className="link-button">Open referral workspace</Link>
+                )}
+              </div>
+            </>
+          )}
+        </article>
+      </section>
+
+      <section className="grid" style={{ marginTop: "24px" }}>
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="panel-kicker">Directory</p>
+              <h2>Lawyer accounts</h2>
             </div>
           </div>
-          <div className="card-body-compact">
-            <div className="card-kicker">RECENT TEMPLATES:</div>
-            <div className="template-item">NDA v1.2</div>
-            <div className="template-item">Contractor Agrmt</div>
+
+          <div className="lawyer-grid">
+            {lawyers.map((lawyer) => (
+              <article key={lawyer.id} className="selected-lawyer">
+                <h3>{lawyer.name}</h3>
+                <p>{lawyer.firm}</p>
+                <p>{lawyer.specialty}</p>
+                <p>{lawyer.city}</p>
+                <p>{lawyer.email}</p>
+              </article>
+            ))}
           </div>
-          <div className="sm-action">
-            <Link href="#" className="btn-secondary sm-btn">View All Templates</Link>
+        </article>
+
+        <article className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="panel-kicker">System note</p>
+              <h2>Role boundaries</h2>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
+
+          <div className="access-note">
+            <p><strong>Admins</strong> can create lawyer accounts and access platform data, but not private client-lawyer threads.</p>
+            <p><strong>Lawyers</strong> sign in to access only the cases assigned to their account.</p>
+            <p><strong>Clients</strong> self-register and access only their own cases and conversations.</p>
+          </div>
+        </article>
+      </section>
+    </>
   );
 }

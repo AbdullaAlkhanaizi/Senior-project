@@ -2,12 +2,16 @@
 
 This repository is a local starter for a legal consultant website with:
 
-- A login or guest entry page.
-- A separate sign up page.
+- A login page for admins, lawyers, and clients plus guest preview access.
+- A separate client sign up page.
 - A home hub page that points users to the AI page, FAQ page, or messaging page.
 - A chatbot window placeholder that you can connect to your own AI and legal knowledge source.
 - Lawyer and law firm referral cards for complex questions.
 - A client-lawyer messaging workspace with file upload support.
+- Role-aware account boundaries:
+  - clients sign up from the public form
+  - lawyers are created by admins only
+  - admins cannot open client-lawyer message threads
 - FAQ suggestions that can be populated by the chatbot.
 - A Go backend with SQLite storage.
 - A Next.js frontend using normal HTML and CSS.
@@ -46,6 +50,23 @@ go run ./cmd/server
 ```
 
 The backend runs on `http://localhost:8080`.
+
+## Default seeded accounts
+
+These are intended for local development only:
+
+- Admin: `admin@legal-portal.local` / `ChangeMe123!`
+- Sample client: `client@legal-portal.local` / `Client123!`
+- Seeded lawyers use their listed email with password `Lawyer123!`
+
+You can override the seeded admin account with:
+
+```powershell
+$env:ADMIN_NAME="Your Admin Name"
+$env:ADMIN_EMAIL="you@example.com"
+$env:ADMIN_PASSWORD="UseAStrongPassword"
+$env:AUTH_SECRET="replace-this-in-real-use"
+```
 
 ## Run the frontend
 
@@ -90,6 +111,7 @@ The frontend already includes a dedicated AI page. You can later replace the pla
 - `POST /api/auth/login`
 - `POST /api/auth/signup`
 - `POST /api/auth/guest`
+- `POST /api/admin/lawyers`
 - `GET /api/dashboard`
 - `GET /api/cases`
 - `POST /api/cases`

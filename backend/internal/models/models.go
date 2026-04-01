@@ -1,9 +1,16 @@
 package models
 
+const (
+	RoleGuest  = "guest"
+	RoleClient = "client"
+	RoleLawyer = "lawyer"
+	RoleAdmin  = "admin"
+)
+
 type DashboardResponse struct {
 	FAQSuggestions []FAQSuggestion `json:"faqSuggestions"`
 	Lawyers        []Lawyer        `json:"lawyers"`
-	ActiveCase     CaseDetails     `json:"activeCase"`
+	ActiveCase     *CaseDetails    `json:"activeCase,omitempty"`
 }
 
 type FAQSuggestion struct {
@@ -15,6 +22,7 @@ type FAQSuggestion struct {
 
 type Lawyer struct {
 	ID        int64  `json:"id"`
+	UserID    int64  `json:"userId,omitempty"`
 	Name      string `json:"name"`
 	Firm      string `json:"firm"`
 	Specialty string `json:"specialty"`
@@ -31,6 +39,7 @@ type CaseSummary struct {
 	Status          string `json:"status"`
 	ProgressPercent int    `json:"progressPercent"`
 	ClientName      string `json:"clientName"`
+	ClientUserID    int64  `json:"clientUserId,omitempty"`
 	LawyerID        int64  `json:"lawyerId"`
 	CreatedAt       string `json:"createdAt"`
 }
@@ -62,10 +71,11 @@ type CaseDetails struct {
 }
 
 type CreateCaseRequest struct {
-	Title      string `json:"title"`
-	Summary    string `json:"summary"`
-	ClientName string `json:"clientName"`
-	LawyerID   int64  `json:"lawyerId"`
+	Title        string `json:"title"`
+	Summary      string `json:"summary"`
+	ClientName   string `json:"clientName"`
+	LawyerID     int64  `json:"lawyerId"`
+	ClientUserID int64  `json:"-"`
 }
 
 type CreateMessageRequest struct {
@@ -85,13 +95,27 @@ type SignupRequest struct {
 	Password string `json:"password"`
 }
 
+type CreateLawyerAccountRequest struct {
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	Firm      string `json:"firm"`
+	Specialty string `json:"specialty"`
+	City      string `json:"city"`
+	Phone     string `json:"phone"`
+	Bio       string `json:"bio"`
+}
+
 type GuestRequest struct {
 	Name string `json:"name"`
 }
 
 type AuthResponse struct {
-	ID    int64  `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Mode  string `json:"mode"`
+	ID       int64  `json:"id"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+	Mode     string `json:"mode"`
+	Token    string `json:"token,omitempty"`
+	LawyerID int64  `json:"lawyerId,omitempty"`
 }

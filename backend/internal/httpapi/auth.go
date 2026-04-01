@@ -36,6 +36,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	token, err := s.issueToken(user)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	user.Token = token
 	writeJSON(w, http.StatusOK, user)
 }
 
@@ -55,7 +62,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.store.CreateUser(r.Context(), req)
+	user, err := s.store.CreateClient(r.Context(), req)
 	if err != nil {
 		if errors.Is(err, store.ErrUserExists) {
 			writeError(w, http.StatusConflict, err.Error())
@@ -65,7 +72,60 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	token, err := s.issueToken(user)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	user.Token = token
 	writeJSON(w, http.StatusCreated, user)
+}
+
+func (s *Server) handleAdminLawyers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	if _, err := s.requireAdmin(r); err != nil {
+		status := http.StatusUnauthorized
+		if errors.Is(err, errForbidden) {
+			status = http.StatusForbidden
+		}
+		writeError(w, status, err.Error())
+		return
+	}
+
+	var req models.CreateLawyerAccountRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+
+	if strings.TrimSpace(req.Name) == "" ||
+		strings.TrimSpace(req.Email) == "" ||
+		len(req.Password) < 6 ||
+		strings.TrimSpace(req.Firm) == "" ||
+		strings.TrimSpace(req.Specialty) == "" ||
+		strings.TrimSpace(req.City) == "" ||
+		strings.TrimSpace(req.Phone) == "" ||
+		strings.TrimSpace(req.Bio) == "" {
+		writeError(w, http.StatusBadRequest, "name, email, password, firm, specialty, city, phone and bio are required")
+		return
+	}
+
+	lawyer, err := s.store.CreateLawyerAccount(r.Context(), req)
+	if err != nil {
+		if errors.Is(err, store.ErrUserExists) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, lawyer)
 }
 
 func (s *Server) handleGuest(w http.ResponseWriter, r *http.Request) {

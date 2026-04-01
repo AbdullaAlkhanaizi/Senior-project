@@ -560,8 +560,7 @@ export default function AuthClient() {
           </h1>
 
           <p className="sub-heading">
-            Unlock access to your saved documents,<br />
-            messages, and AI tools.
+            Sign in as a client, lawyer, or admin to open your role-specific workspace.
           </p>
 
           <div className="login-card">
@@ -570,7 +569,7 @@ export default function AuthClient() {
             </div>
 
             <div className="card-body">
-              <p className="card-kicker">MEMBER LOGIN</p>
+              <p className="card-kicker">CLIENT, LAWYER, OR ADMIN</p>
 
               <form onSubmit={handleLogin}>
                 <div className="form-group">
@@ -671,7 +670,7 @@ export default function AuthClient() {
           </p>
 
           <div className="signin-footer">
-            Already have an account? <Link href="#">Sign in &gt;</Link>
+            Need a client account? <Link href="/signup">Create one &gt;</Link>
           </div>
         </div>
       </section>
