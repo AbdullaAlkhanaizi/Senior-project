@@ -1,0 +1,6 @@
+Admin Acoount : admin@legal-portal.local / ChangeMe123!
+simple user : client@legal-portal.local / Client123!
+
+noor@justicegate.example / Lawyer123!
+khalid@rahmanpartners.example / Lawyer123!
+sara@haddadlegal.example / Lawyer123!
