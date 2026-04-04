@@ -46,6 +46,7 @@ export default function PortalShell({ title, description, hideHero, children }) 
 
   const role = session?.role || "guest";
   const showMessaging = role !== "admin";
+  const isGuest = !session?.token;
 
   return (
     <div className="portal-layout">
@@ -66,10 +67,14 @@ export default function PortalShell({ title, description, hideHero, children }) 
             </nav>
             <div className="portal-divider"></div>
             <div className="portal-account-strip">
-              <div className="portal-account-meta">
-                <span className="portal-role-badge">{ROLE_LABELS[role] || "Account"}</span>
-                <strong>{session?.name || "Explorer"}</strong>
-              </div>
+              {session?.token ? (
+                <div className="portal-account-meta">
+                  <span className="portal-role-badge">{ROLE_LABELS[role] || "Account"}</span>
+                  <strong>{session?.name || "Explorer"}</strong>
+                </div>
+              ) : (
+                <span className="portal-guest-pill">Guest User</span>
+              )}
               {session?.token ? (
                 <button type="button" className="portal-logout-btn" onClick={handleLogout}>
                   Log out
@@ -104,8 +109,8 @@ export default function PortalShell({ title, description, hideHero, children }) 
                 aria-label="Search"
                 onClick={handleSearchToggle}
                 style={{
-                  background: "white",
-                  borderRadius: "50%",
+                  background: isGuest ? "rgba(255, 255, 255, 0.74)" : "white",
+                  borderRadius: isGuest ? "999px" : "50%",
                   width: "42px",
                   height: "42px",
                   display: "flex",
