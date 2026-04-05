@@ -537,79 +537,90 @@ export default function MessagingClient() {
                 </button>
               </div>
 
-              <div className="progress-card">
-                <div className="progress-meta">
-                  <div>
-                    <p className="muted">Issue summary</p>
-                    <h3>{activeCase.case.title}</h3>
+              <div className="client-case-shell lawyer-case-shell">
+                <aside className="client-case-sidebar lawyer-case-sidebar">
+                  <div className="client-case-sidebar-header">
+                    <p className="panel-kicker">Case steps</p>
+                    <h3>{activeCase.case.progressPercent}% complete</h3>
                   </div>
-                  <strong>{activeCase.case.progressPercent}%</strong>
-                </div>
-                <p className="case-summary-text">{activeCase.case.summary}</p>
-                <div className="case-meta-row">
-                  <span className={`mini-status ${activeCase.case.decisionStatus}`}>{activeCase.case.decisionStatus}</span>
-                  <span>{new Date(activeCase.case.createdAt).toLocaleString()}</span>
-                </div>
-                {activeCase.case.decisionNote ? (
-                  <p className="case-note"><strong>Lawyer note:</strong> {activeCase.case.decisionNote}</p>
-                ) : null}
-                <div className="progress-bar">
-                  <div style={{ width: `${activeCase.case.progressPercent}%` }} />
-                </div>
-                <div className="timeline">
-                  {activeCase.updates.map((step) => (
-                    <article key={step.id} className={`timeline-step ${step.state}`}>
-                      <span />
+                  <div className="timeline">
+                    {activeCase.updates.map((step) => (
+                      <article key={step.id} className={`timeline-step ${step.state}`}>
+                        <span />
+                        <div>
+                          <h4>{step.label}</h4>
+                          <p>{step.state}</p>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </aside>
+
+                <div className="client-case-main">
+                  <div className="progress-card">
+                    <div className="progress-meta">
                       <div>
-                        <h4>{step.label}</h4>
-                        <p>{step.state}</p>
+                        <p className="muted">Issue summary</p>
+                        <h3>{activeCase.case.title}</h3>
                       </div>
-                    </article>
-                  ))}
+                      <strong>{activeCase.case.progressPercent}%</strong>
+                    </div>
+                    <p className="case-summary-text">{activeCase.case.summary}</p>
+                    <div className="case-meta-row">
+                      <span className={`mini-status ${activeCase.case.decisionStatus}`}>{activeCase.case.decisionStatus}</span>
+                      <span>{new Date(activeCase.case.createdAt).toLocaleString()}</span>
+                    </div>
+                    {activeCase.case.decisionNote ? (
+                      <p className="case-note"><strong>Lawyer note:</strong> {activeCase.case.decisionNote}</p>
+                    ) : null}
+                    <div className="progress-bar">
+                      <div style={{ width: `${activeCase.case.progressPercent}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="message-feed">
+                    {activeCase.messages.map((item) => (
+                      <article key={item.id} className={`message-card ${item.senderType}`}>
+                        <div className="message-meta">
+                          <strong>{item.senderName}</strong>
+                          <span>{new Date(item.createdAt).toLocaleString()}</span>
+                        </div>
+                        <p>{item.body}</p>
+                        {item.attachmentUrl ? (
+                          <a href={`${API_BASE}${item.attachmentUrl}`} target="_blank" rel="noreferrer">
+                            {item.attachmentName}
+                          </a>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+
+                  {canMessage ? (
+                    <form className="message-form" onSubmit={handleMessageSend}>
+                      <textarea
+                        value={messageInput}
+                        onChange={(event) => setMessageInput(event.target.value)}
+                        placeholder="Send a message to your lawyer"
+                      />
+                      <div className="message-actions">
+                        <label className={`upload-button ${uploading ? "disabled" : ""}`}>
+                          <input type="file" onChange={handleUpload} disabled={uploading} />
+                          Upload file
+                        </label>
+                        <button type="submit">Send message</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <p className="hero-copy">
+                      {activeCase.case.decisionStatus === "pending"
+                        ? "Messaging opens after the lawyer accepts the case."
+                        : activeCase.case.decisionStatus === "declined"
+                          ? "This request was declined. Create a new request with another lawyer to continue."
+                          : "Sign in to continue."}
+                    </p>
+                  )}
                 </div>
               </div>
-
-              <div className="message-feed">
-                {activeCase.messages.map((item) => (
-                  <article key={item.id} className={`message-card ${item.senderType}`}>
-                    <div className="message-meta">
-                      <strong>{item.senderName}</strong>
-                      <span>{new Date(item.createdAt).toLocaleString()}</span>
-                    </div>
-                    <p>{item.body}</p>
-                    {item.attachmentUrl ? (
-                      <a href={`${API_BASE}${item.attachmentUrl}`} target="_blank" rel="noreferrer">
-                        {item.attachmentName}
-                      </a>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-
-              {canMessage ? (
-                <form className="message-form" onSubmit={handleMessageSend}>
-                  <textarea
-                    value={messageInput}
-                    onChange={(event) => setMessageInput(event.target.value)}
-                    placeholder="Send a message to your lawyer"
-                  />
-                  <div className="message-actions">
-                    <label className={`upload-button ${uploading ? "disabled" : ""}`}>
-                      <input type="file" onChange={handleUpload} disabled={uploading} />
-                      Upload file
-                    </label>
-                    <button type="submit">Send message</button>
-                  </div>
-                </form>
-              ) : (
-                <p className="hero-copy">
-                  {activeCase.case.decisionStatus === "pending"
-                    ? "Messaging opens after the lawyer accepts the case."
-                    : activeCase.case.decisionStatus === "declined"
-                      ? "This request was declined. Create a new request with another lawyer to continue."
-                      : "Sign in to continue."}
-                </p>
-              )}
             </div>
           ) : (
             <div className="panel messaging-panel">
@@ -706,136 +717,148 @@ export default function MessagingClient() {
                 </div>
               ) : null}
 
-              <div className="progress-card">
-                <div className="progress-meta">
-                  <div>
-                    <p className="muted">Issue summary</p>
-                    <h3>{activeCase.case.title}</h3>
+              <div className="client-case-shell">
+                <aside className="client-case-sidebar">
+                  <div className="client-case-sidebar-header">
+                    <p className="panel-kicker">Case steps</p>
+                    <h3>{activeCase.case.progressPercent}% complete</h3>
                   </div>
-                  <strong>{activeCase.case.progressPercent}%</strong>
-                </div>
-                <p className="case-summary-text">{activeCase.case.summary}</p>
-                <div className="case-meta-row">
-                  <span className={`mini-status ${activeCase.case.decisionStatus}`}>{activeCase.case.decisionStatus}</span>
-                  <span>{new Date(activeCase.case.createdAt).toLocaleString()}</span>
-                </div>
-                {activeCase.case.decisionNote ? (
-                  <p className="case-note"><strong>Lawyer note:</strong> {activeCase.case.decisionNote}</p>
-                ) : null}
-                <div className="progress-bar">
-                  <div style={{ width: `${activeCase.case.progressPercent}%` }} />
-                </div>
-                <div className="timeline">
-                  {activeCase.updates.map((step) => (
-                    <form
-                      key={step.id}
-                      className={`timeline-step timeline-step-editor ${step.state} ${draggedStepId === step.id ? "dragging" : ""} ${dragOverStepId === step.id && draggedStepId !== step.id ? "drag-target" : ""}`}
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        handleStepSave(step.id);
-                      }}
-                      onDragOver={(event) => handleStepDragOver(event, step.id)}
-                      onDrop={(event) => handleStepDrop(event, step.id)}
-                    >
-                      <span />
-                      <div className="timeline-step-editor-body">
-                        <input
-                          value={stepDrafts[step.id]?.label || ""}
-                          onChange={(event) => updateStepDraft(step.id, "label", event.target.value)}
-                          placeholder="Step label"
-                        />
-                        <div className="timeline-step-editor-actions">
-                          <span
-                            className="timeline-step-handle"
-                            draggable
-                            onDragStart={(event) => handleStepDragStart(event, step.id)}
-                            onDragEnd={resetStepDragState}
-                          >
-                            Drag
-                          </span>
-                          <select
-                            value={stepDrafts[step.id]?.state || "upcoming"}
-                            onChange={(event) => updateStepDraft(step.id, "state", event.target.value)}
-                          >
-                            {STEP_STATE_OPTIONS.map((option) => (
-                              <option key={option} value={option}>{option}</option>
-                            ))}
-                          </select>
-                          <button type="submit">Save</button>
-                          <button
-                            type="button"
-                            className="button-secondary"
-                            onClick={() => handleStepDelete(step.id)}
-                          >
-                            Remove
-                          </button>
+                  <div className="timeline">
+                    {activeCase.updates.map((step) => (
+                      <form
+                        key={step.id}
+                        className={`timeline-step timeline-step-editor ${step.state} ${draggedStepId === step.id ? "dragging" : ""} ${dragOverStepId === step.id && draggedStepId !== step.id ? "drag-target" : ""}`}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          handleStepSave(step.id);
+                        }}
+                        onDragOver={(event) => handleStepDragOver(event, step.id)}
+                        onDrop={(event) => handleStepDrop(event, step.id)}
+                      >
+                        <span />
+                        <div className="timeline-step-editor-body">
+                          <input
+                            value={stepDrafts[step.id]?.label || ""}
+                            onChange={(event) => updateStepDraft(step.id, "label", event.target.value)}
+                            placeholder="Step label"
+                          />
+                          <div className="timeline-step-editor-actions">
+                            <select
+                              value={stepDrafts[step.id]?.state || "upcoming"}
+                              onChange={(event) => updateStepDraft(step.id, "state", event.target.value)}
+                            >
+                              {STEP_STATE_OPTIONS.map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                              ))}
+                            </select>
+                            <button type="submit">Save</button>
+                            <button
+                              type="button"
+                              className="button-secondary"
+                              onClick={() => handleStepDelete(step.id)}
+                            >
+                              Remove
+                            </button>
+                            <button
+                              type="button"
+                              className="timeline-step-handle"
+                              draggable
+                              onDragStart={(event) => handleStepDragStart(event, step.id)}
+                              onDragEnd={resetStepDragState}
+                            >
+                              Drag
+                            </button>
+                          </div>
                         </div>
+                      </form>
+                    ))}
+                  </div>
+                  <form className="timeline-add-form" onSubmit={handleStepCreate}>
+                    <h4>Add case step</h4>
+                    <input
+                      value={newStep.label}
+                      onChange={(event) => setNewStep((current) => ({ ...current, label: event.target.value }))}
+                      placeholder="New step label"
+                    />
+                    <div className="timeline-add-actions">
+                      <select
+                        value={newStep.state}
+                        onChange={(event) => setNewStep((current) => ({ ...current, state: event.target.value }))}
+                      >
+                        {STEP_STATE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                      <button type="submit">Add step</button>
+                    </div>
+                  </form>
+                </aside>
+
+                <div className="client-case-main">
+                  <div className="progress-card">
+                    <div className="progress-meta">
+                      <div>
+                        <p className="muted">Issue summary</p>
+                        <h3>{activeCase.case.title}</h3>
+                      </div>
+                      <strong>{activeCase.case.progressPercent}%</strong>
+                    </div>
+                    <p className="case-summary-text">{activeCase.case.summary}</p>
+                    <div className="case-meta-row">
+                      <span className={`mini-status ${activeCase.case.decisionStatus}`}>{activeCase.case.decisionStatus}</span>
+                      <span>{new Date(activeCase.case.createdAt).toLocaleString()}</span>
+                    </div>
+                    {activeCase.case.decisionNote ? (
+                      <p className="case-note"><strong>Lawyer note:</strong> {activeCase.case.decisionNote}</p>
+                    ) : null}
+                    <div className="progress-bar">
+                      <div style={{ width: `${activeCase.case.progressPercent}%` }} />
+                    </div>
+                  </div>
+
+                  <div className="message-feed">
+                    {activeCase.messages.map((item) => (
+                      <article key={item.id} className={`message-card ${item.senderType}`}>
+                        <div className="message-meta">
+                          <strong>{item.senderName}</strong>
+                          <span>{new Date(item.createdAt).toLocaleString()}</span>
+                        </div>
+                        <p>{item.body}</p>
+                        {item.attachmentUrl ? (
+                          <a href={`${API_BASE}${item.attachmentUrl}`} target="_blank" rel="noreferrer">
+                            {item.attachmentName}
+                          </a>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+
+                  {canMessage ? (
+                    <form className="message-form" onSubmit={handleMessageSend}>
+                      <textarea
+                        value={messageInput}
+                        onChange={(event) => setMessageInput(event.target.value)}
+                        placeholder="Send an update to your client"
+                      />
+                      <div className="message-actions">
+                        <label className={`upload-button ${uploading ? "disabled" : ""}`}>
+                          <input type="file" onChange={handleUpload} disabled={uploading} />
+                          Upload file
+                        </label>
+                        <button type="submit">Send message</button>
                       </div>
                     </form>
-                  ))}
+                  ) : (
+                    <p className="hero-copy">
+                      {activeCase.case.decisionStatus === "pending"
+                        ? "Messaging opens after you accept the case."
+                        : activeCase.case.decisionStatus === "declined"
+                          ? "This request was declined. Return to your case list to review other requests."
+                          : "Sign in to continue."}
+                    </p>
+                  )}
                 </div>
-                <form className="timeline-add-form" onSubmit={handleStepCreate}>
-                  <h4>Add case step</h4>
-                  <input
-                    value={newStep.label}
-                    onChange={(event) => setNewStep((current) => ({ ...current, label: event.target.value }))}
-                    placeholder="New step label"
-                  />
-                  <div className="timeline-add-actions">
-                    <select
-                      value={newStep.state}
-                      onChange={(event) => setNewStep((current) => ({ ...current, state: event.target.value }))}
-                    >
-                      {STEP_STATE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>{option}</option>
-                      ))}
-                    </select>
-                    <button type="submit">Add step</button>
-                  </div>
-                </form>
               </div>
-
-              <div className="message-feed">
-                {activeCase.messages.map((item) => (
-                  <article key={item.id} className={`message-card ${item.senderType}`}>
-                    <div className="message-meta">
-                      <strong>{item.senderName}</strong>
-                      <span>{new Date(item.createdAt).toLocaleString()}</span>
-                    </div>
-                    <p>{item.body}</p>
-                    {item.attachmentUrl ? (
-                      <a href={`${API_BASE}${item.attachmentUrl}`} target="_blank" rel="noreferrer">
-                        {item.attachmentName}
-                      </a>
-                    ) : null}
-                  </article>
-                ))}
-              </div>
-
-              {canMessage ? (
-                <form className="message-form" onSubmit={handleMessageSend}>
-                  <textarea
-                    value={messageInput}
-                    onChange={(event) => setMessageInput(event.target.value)}
-                    placeholder="Send an update to your client"
-                  />
-                  <div className="message-actions">
-                    <label className={`upload-button ${uploading ? "disabled" : ""}`}>
-                      <input type="file" onChange={handleUpload} disabled={uploading} />
-                      Upload file
-                    </label>
-                    <button type="submit">Send message</button>
-                  </div>
-                </form>
-              ) : (
-                <p className="hero-copy">
-                  {activeCase.case.decisionStatus === "pending"
-                    ? "Messaging opens after you accept the case."
-                    : activeCase.case.decisionStatus === "declined"
-                      ? "This request was declined. Return to your case list to review other requests."
-                      : "Sign in to continue."}
-                </p>
-              )}
             </div>
           ) : (
             <div className="panel messaging-panel">

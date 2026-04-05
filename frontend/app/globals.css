@@ -972,6 +972,32 @@ button:active,
 .timeline-add-form input,
 .timeline-add-form select {
   width: 100%;
+  min-width: 0;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+  transition:
+    border-color 180ms var(--easing),
+    box-shadow 180ms var(--easing),
+    background 180ms var(--easing);
+}
+
+.timeline-step-editor-body input::placeholder,
+.timeline-add-form input::placeholder {
+  color: #8b9089;
+}
+
+.timeline-step-editor-body input:focus,
+.timeline-step-editor-body select:focus,
+.timeline-add-form input:focus,
+.timeline-add-form select:focus {
+  border-color: rgba(59, 130, 246, 0.8);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.22);
+  background: #fff;
 }
 
 .timeline-step-editor-actions,
@@ -979,12 +1005,13 @@ button:active,
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  align-items: center;
+  align-items: stretch;
 }
 
 .timeline-step-editor-actions select,
 .timeline-add-actions select {
   min-width: 150px;
+  flex: 1 1 180px;
 }
 
 .timeline-step-handle {
@@ -992,17 +1019,38 @@ button:active,
   align-items: center;
   justify-content: center;
   min-height: 42px;
-  padding: 0 12px;
-  border: 1px dashed rgba(31, 35, 31, 0.18);
-  border-radius: 10px;
-  color: var(--muted);
-  background: rgba(255, 255, 255, 0.72);
+  min-width: 88px;
+  padding: 0 16px;
+  border: 1px solid rgba(31, 35, 31, 0.08);
+  border-radius: var(--radius-md);
+  color: #fff8f2;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font: inherit;
+  background: linear-gradient(135deg, var(--sage), #2d5c4e);
+  box-shadow: 0 8px 18px rgba(44, 85, 72, 0.22);
   cursor: grab;
   user-select: none;
+  transition:
+    transform 180ms var(--easing),
+    box-shadow 180ms var(--easing),
+    filter 180ms var(--easing);
+}
+
+.timeline-step-handle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 20px rgba(44, 85, 72, 0.28);
+  filter: brightness(0.96);
 }
 
 .timeline-step-handle:active {
   cursor: grabbing;
+  transform: translateY(0);
+}
+
+.timeline-step-handle:focus-visible {
+  outline: 2px solid rgba(44, 85, 72, 0.35);
+  outline-offset: 2px;
 }
 
 .timeline-add-form {
@@ -5545,6 +5593,43 @@ a.sm-btn:hover {
   margin: 6px 0 0;
 }
 
+.client-case-shell {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.lawyer-case-shell {
+  grid-template-columns: minmax(280px, 0.42fr) minmax(0, 1fr);
+}
+
+.client-case-sidebar,
+.client-case-main {
+  display: grid;
+  gap: 16px;
+}
+
+.client-case-sidebar {
+  align-content: start;
+  padding: 18px;
+  border: 1px solid rgba(31, 35, 31, 0.1);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(145deg, rgba(255, 252, 246, 0.98), rgba(248, 240, 229, 0.92));
+  box-shadow: var(--shadow-card);
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.client-case-sidebar-header h3 {
+  margin: 6px 0 0;
+}
+
 .panel-back-button {
   flex-shrink: 0;
 }
@@ -6112,6 +6197,10 @@ a.sm-btn:hover {
 @media (max-width: 900px) {
   .client-messaging-grid {
     width: 100%;
+  }
+
+  .client-case-shell {
+    grid-template-columns: 1fr;
   }
 
   .portal-account-strip {
