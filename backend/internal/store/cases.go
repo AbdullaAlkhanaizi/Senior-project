@@ -598,6 +598,80 @@ func (s *Store) DeleteCaseUpdate(ctx context.Context, caseID, updateID int64) (m
 	return s.LoadCaseDetails(ctx, caseID)
 }
 
+func (s *Store) ReorderCaseUpdates(ctx context.Context, caseID int64, updateIDs []int64) (models.CaseDetails, error) {
+	if len(updateIDs) == 0 {
+		return models.CaseDetails{}, errors.New("update ids are required")
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return models.CaseDetails{}, err
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id
+		FROM case_updates
+		WHERE case_id = ?
+		ORDER BY sort_order ASC, id ASC`, caseID)
+	if err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	var existingIDs []int64
+	for rows.Next() {
+		var updateID int64
+		if err := rows.Scan(&updateID); err != nil {
+			rows.Close()
+			return models.CaseDetails{}, err
+		}
+		existingIDs = append(existingIDs, updateID)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return models.CaseDetails{}, err
+	}
+	rows.Close()
+
+	if len(existingIDs) == 0 {
+		return models.CaseDetails{}, sql.ErrNoRows
+	}
+	if len(existingIDs) != len(updateIDs) {
+		return models.CaseDetails{}, errors.New("update ids must match the full set of case steps")
+	}
+
+	existingSet := make(map[int64]struct{}, len(existingIDs))
+	for _, updateID := range existingIDs {
+		existingSet[updateID] = struct{}{}
+	}
+	for _, updateID := range updateIDs {
+		if _, ok := existingSet[updateID]; !ok {
+			return models.CaseDetails{}, errors.New("update ids must match the full set of case steps")
+		}
+		delete(existingSet, updateID)
+	}
+	if len(existingSet) > 0 {
+		return models.CaseDetails{}, errors.New("update ids must match the full set of case steps")
+	}
+
+	for index, updateID := range updateIDs {
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE case_updates
+			SET sort_order = ?
+			WHERE id = ? AND case_id = ?`,
+			index+1, updateID, caseID,
+		); err != nil {
+			return models.CaseDetails{}, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	return s.LoadCaseDetails(ctx, caseID)
+}
+
 func seedCaseTimeline(ctx context.Context, runner dbRunner, caseID int64, decisionStatus, createdAt string) error {
 	if _, err := runner.ExecContext(ctx, `DELETE FROM case_updates WHERE case_id = ?`, caseID); err != nil {
 		return err

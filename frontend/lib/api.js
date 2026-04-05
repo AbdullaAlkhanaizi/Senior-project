@@ -145,3 +145,12 @@ export async function deleteCaseStep(caseId, stepId) {
   });
   return parseJSON(response);
 }
+
+export async function reorderCaseSteps(caseId, updateIds) {
+  const response = await fetch(`${API_BASE}/api/cases/${caseId}/updates/reorder`, {
+    method: "POST",
+    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ updateIds })
+  });
+  return parseJSON(response);
+}

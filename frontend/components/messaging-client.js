@@ -11,6 +11,7 @@ import {
   getCaseDetails,
   getCases,
   getDashboard,
+  reorderCaseSteps,
   sendCaseMessage,
   updateCaseStep,
   uploadCaseAttachment
@@ -27,6 +28,19 @@ function buildStepDrafts(updates = []) {
     };
     return drafts;
   }, {});
+}
+
+function reorderUpdates(updates, draggedStepId, targetStepId) {
+  const draggedIndex = updates.findIndex((step) => step.id === draggedStepId);
+  const targetIndex = updates.findIndex((step) => step.id === targetStepId);
+  if (draggedIndex < 0 || targetIndex < 0 || draggedIndex === targetIndex) {
+    return updates;
+  }
+
+  const nextUpdates = [...updates];
+  const [draggedStep] = nextUpdates.splice(draggedIndex, 1);
+  nextUpdates.splice(targetIndex, 0, draggedStep);
+  return nextUpdates;
 }
 
 export default function MessagingClient() {
@@ -47,6 +61,9 @@ export default function MessagingClient() {
   const [newStep, setNewStep] = useState({ label: "", state: "upcoming" });
   const [showCreateCaseForm, setShowCreateCaseForm] = useState(false);
   const [clientView, setClientView] = useState("list");
+  const [lawyerView, setLawyerView] = useState("list");
+  const [draggedStepId, setDraggedStepId] = useState(null);
+  const [dragOverStepId, setDragOverStepId] = useState(null);
 
   useEffect(() => {
     const currentSession = loadSession();
@@ -136,6 +153,8 @@ export default function MessagingClient() {
       setActiveCase(details);
       if (isClient) {
         setClientView("details");
+      } else if (isLawyer) {
+        setLawyerView("details");
       }
       setDecisionNote("");
       setStatus("");
@@ -324,6 +343,69 @@ export default function MessagingClient() {
     } catch (requestError) {
       setError(requestError.message);
       setStatus("");
+    }
+  }
+
+  function handleStepDragStart(event, stepId) {
+    if (!isLawyer) {
+      return;
+    }
+
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(stepId));
+    setDraggedStepId(stepId);
+    setDragOverStepId(stepId);
+  }
+
+  function handleStepDragOver(event, stepId) {
+    if (!isLawyer || !draggedStepId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    if (draggedStepId !== stepId) {
+      setDragOverStepId(stepId);
+    }
+  }
+
+  function resetStepDragState() {
+    setDraggedStepId(null);
+    setDragOverStepId(null);
+  }
+
+  async function handleStepDrop(event, targetStepId) {
+    event.preventDefault();
+    if (!isLawyer || !activeCase?.case?.id || !draggedStepId) {
+      resetStepDragState();
+      return;
+    }
+
+    const nextUpdates = reorderUpdates(activeCase.updates, draggedStepId, targetStepId);
+    resetStepDragState();
+    if (nextUpdates === activeCase.updates) {
+      return;
+    }
+
+    setError("");
+    setStatus("Reordering case steps...");
+
+    try {
+      setActiveCase((current) => ({
+        ...current,
+        updates: nextUpdates
+      }));
+      const details = await reorderCaseSteps(activeCase.case.id, nextUpdates.map((step) => step.id));
+      setActiveCase(details);
+      await refreshCases(details.case.id);
+      setStatus("Case steps reordered.");
+    } catch (requestError) {
+      setError(requestError.message);
+      setStatus("");
+      const details = await getCaseDetails(activeCase.case.id).catch(() => null);
+      if (details) {
+        setActiveCase(details);
+      }
     }
   }
 
@@ -541,6 +623,232 @@ export default function MessagingClient() {
                 </button>
               </div>
               <p className="muted">Select one of your cases to open the workspace.</p>
+            </div>
+          )}
+        </section>
+      </>
+    );
+  }
+
+  if (isLawyer) {
+    return (
+      <>
+        {error ? <p className="feedback error">{error}</p> : null}
+        {status ? <p className="feedback">{status}</p> : null}
+
+        <section className="grid lower-grid single-panel-grid client-messaging-grid">
+          {lawyerView === "list" ? (
+            <div className="panel referral-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">Case inbox</p>
+                  <h2>Open an assigned case</h2>
+                </div>
+              </div>
+
+              <div className="case-list">
+                {loadingCases ? (
+                  <p className="muted">Loading cases...</p>
+                ) : cases.length > 0 ? (
+                  cases.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`case-list-item ${selectedCaseId === item.id ? "selected" : ""}`}
+                      onClick={() => handleSelectCase(item.id)}
+                    >
+                      <div className="case-list-top">
+                        <strong>{item.title}</strong>
+                        <strong>{item.progressPercent}%</strong>
+                      </div>
+                      <p>{item.clientName}</p>
+                      <div className="case-list-progress-bar">
+                        <div style={{ width: `${item.progressPercent}%` }} />
+                      </div>
+                      <div className="case-list-top case-list-bottom">
+                        <small>{item.status}</small>
+                        <span className={`mini-status ${item.decisionStatus}`}>{item.decisionStatus}</span>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <p className="muted">No case requests have been assigned to this lawyer account yet.</p>
+                )}
+              </div>
+            </div>
+          ) : activeCase ? (
+            <div className="panel messaging-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">Lawyer workspace</p>
+                  <h2>{caseLabel}</h2>
+                </div>
+                <button type="button" className="button-secondary panel-back-button" onClick={() => setLawyerView("list")}>
+                  Back to cases
+                </button>
+              </div>
+
+              {activeCase.case.decisionStatus === "pending" ? (
+                <div className="decision-panel">
+                  <p className="hero-copy">
+                    Review the issue summary, then accept or decline the request. The private thread opens only after acceptance.
+                  </p>
+                  <textarea
+                    className="decision-note"
+                    value={decisionNote}
+                    onChange={(event) => setDecisionNote(event.target.value)}
+                    placeholder="Optional note for the client"
+                  />
+                  <div className="decision-actions">
+                    <button type="button" onClick={() => handleDecision("accepted")}>Accept case</button>
+                    <button type="button" className="button-secondary" onClick={() => handleDecision("declined")}>Decline case</button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="progress-card">
+                <div className="progress-meta">
+                  <div>
+                    <p className="muted">Issue summary</p>
+                    <h3>{activeCase.case.title}</h3>
+                  </div>
+                  <strong>{activeCase.case.progressPercent}%</strong>
+                </div>
+                <p className="case-summary-text">{activeCase.case.summary}</p>
+                <div className="case-meta-row">
+                  <span className={`mini-status ${activeCase.case.decisionStatus}`}>{activeCase.case.decisionStatus}</span>
+                  <span>{new Date(activeCase.case.createdAt).toLocaleString()}</span>
+                </div>
+                {activeCase.case.decisionNote ? (
+                  <p className="case-note"><strong>Lawyer note:</strong> {activeCase.case.decisionNote}</p>
+                ) : null}
+                <div className="progress-bar">
+                  <div style={{ width: `${activeCase.case.progressPercent}%` }} />
+                </div>
+                <div className="timeline">
+                  {activeCase.updates.map((step) => (
+                    <form
+                      key={step.id}
+                      className={`timeline-step timeline-step-editor ${step.state} ${draggedStepId === step.id ? "dragging" : ""} ${dragOverStepId === step.id && draggedStepId !== step.id ? "drag-target" : ""}`}
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        handleStepSave(step.id);
+                      }}
+                      onDragOver={(event) => handleStepDragOver(event, step.id)}
+                      onDrop={(event) => handleStepDrop(event, step.id)}
+                    >
+                      <span />
+                      <div className="timeline-step-editor-body">
+                        <input
+                          value={stepDrafts[step.id]?.label || ""}
+                          onChange={(event) => updateStepDraft(step.id, "label", event.target.value)}
+                          placeholder="Step label"
+                        />
+                        <div className="timeline-step-editor-actions">
+                          <span
+                            className="timeline-step-handle"
+                            draggable
+                            onDragStart={(event) => handleStepDragStart(event, step.id)}
+                            onDragEnd={resetStepDragState}
+                          >
+                            Drag
+                          </span>
+                          <select
+                            value={stepDrafts[step.id]?.state || "upcoming"}
+                            onChange={(event) => updateStepDraft(step.id, "state", event.target.value)}
+                          >
+                            {STEP_STATE_OPTIONS.map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                          </select>
+                          <button type="submit">Save</button>
+                          <button
+                            type="button"
+                            className="button-secondary"
+                            onClick={() => handleStepDelete(step.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  ))}
+                </div>
+                <form className="timeline-add-form" onSubmit={handleStepCreate}>
+                  <h4>Add case step</h4>
+                  <input
+                    value={newStep.label}
+                    onChange={(event) => setNewStep((current) => ({ ...current, label: event.target.value }))}
+                    placeholder="New step label"
+                  />
+                  <div className="timeline-add-actions">
+                    <select
+                      value={newStep.state}
+                      onChange={(event) => setNewStep((current) => ({ ...current, state: event.target.value }))}
+                    >
+                      {STEP_STATE_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                    <button type="submit">Add step</button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="message-feed">
+                {activeCase.messages.map((item) => (
+                  <article key={item.id} className={`message-card ${item.senderType}`}>
+                    <div className="message-meta">
+                      <strong>{item.senderName}</strong>
+                      <span>{new Date(item.createdAt).toLocaleString()}</span>
+                    </div>
+                    <p>{item.body}</p>
+                    {item.attachmentUrl ? (
+                      <a href={`${API_BASE}${item.attachmentUrl}`} target="_blank" rel="noreferrer">
+                        {item.attachmentName}
+                      </a>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+
+              {canMessage ? (
+                <form className="message-form" onSubmit={handleMessageSend}>
+                  <textarea
+                    value={messageInput}
+                    onChange={(event) => setMessageInput(event.target.value)}
+                    placeholder="Send an update to your client"
+                  />
+                  <div className="message-actions">
+                    <label className={`upload-button ${uploading ? "disabled" : ""}`}>
+                      <input type="file" onChange={handleUpload} disabled={uploading} />
+                      Upload file
+                    </label>
+                    <button type="submit">Send message</button>
+                  </div>
+                </form>
+              ) : (
+                <p className="hero-copy">
+                  {activeCase.case.decisionStatus === "pending"
+                    ? "Messaging opens after you accept the case."
+                    : activeCase.case.decisionStatus === "declined"
+                      ? "This request was declined. Return to your case list to review other requests."
+                      : "Sign in to continue."}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="panel messaging-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">Lawyer workspace</p>
+                  <h2>No case selected</h2>
+                </div>
+                <button type="button" className="button-secondary panel-back-button" onClick={() => setLawyerView("list")}>
+                  Back to cases
+                </button>
+              </div>
+              <p className="muted">Select one of your assigned cases to open the workspace.</p>
             </div>
           )}
         </section>

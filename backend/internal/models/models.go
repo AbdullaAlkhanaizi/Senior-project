@@ -92,6 +92,10 @@ type UpsertCaseUpdateRequest struct {
 	State string `json:"state"`
 }
 
+type ReorderCaseUpdatesRequest struct {
+	UpdateIDs []int64 `json:"updateIds"`
+}
+
 type CreateMessageRequest struct {
 	SenderType string `json:"senderType"`
 	SenderName string `json:"senderName"`

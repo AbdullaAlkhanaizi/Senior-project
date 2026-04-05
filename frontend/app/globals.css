@@ -946,6 +946,20 @@ button:active,
   border: 1px solid rgba(31, 35, 31, 0.09);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.54);
+  transition:
+    border-color 180ms var(--easing),
+    transform 180ms var(--easing),
+    box-shadow 180ms var(--easing);
+}
+
+.timeline-step-editor.drag-target {
+  border-color: rgba(188, 95, 58, 0.32);
+  box-shadow: 0 10px 22px rgba(69, 47, 29, 0.12);
+}
+
+.timeline-step-editor.dragging {
+  opacity: 0.72;
+  transform: scale(0.99);
 }
 
 .timeline-step-editor-body {
@@ -971,6 +985,24 @@ button:active,
 .timeline-step-editor-actions select,
 .timeline-add-actions select {
   min-width: 150px;
+}
+
+.timeline-step-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px dashed rgba(31, 35, 31, 0.18);
+  border-radius: 10px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.72);
+  cursor: grab;
+  user-select: none;
+}
+
+.timeline-step-handle:active {
+  cursor: grabbing;
 }
 
 .timeline-add-form {
@@ -5487,6 +5519,10 @@ a.sm-btn:hover {
   margin-top: 14px;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.case-list-bottom {
+  margin-top: 12px;
 }
 
 .client-case-launcher {

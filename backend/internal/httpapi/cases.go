@@ -302,6 +302,36 @@ func (s *Server) handleCaseUpdates(w http.ResponseWriter, r *http.Request, caseI
 		return
 	}
 
+	if parts[2] == "reorder" {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var req models.ReorderCaseUpdatesRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid json body")
+			return
+		}
+
+		details, err := s.store.ReorderCaseUpdates(r.Context(), caseID, req.UpdateIDs)
+		if err != nil {
+			if strings.Contains(err.Error(), "update ids") {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			if errors.Is(err, sql.ErrNoRows) {
+				writeError(w, http.StatusNotFound, "case steps not found")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, details)
+		return
+	}
+
 	updateID, err := strconv.ParseInt(parts[2], 10, 64)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid update id")
