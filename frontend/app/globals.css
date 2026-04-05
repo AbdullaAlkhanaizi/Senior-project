@@ -932,6 +932,50 @@ button:active,
   text-transform: capitalize;
 }
 
+.timeline-step-editor {
+  padding: 14px;
+  border: 1px solid rgba(31, 35, 31, 0.09);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.timeline-step-editor-body {
+  display: grid;
+  gap: 10px;
+}
+
+.timeline-step-editor-body input,
+.timeline-step-editor-body select,
+.timeline-add-form input,
+.timeline-add-form select {
+  width: 100%;
+}
+
+.timeline-step-editor-actions,
+.timeline-add-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.timeline-step-editor-actions select,
+.timeline-add-actions select {
+  min-width: 150px;
+}
+
+.timeline-add-form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(31, 35, 31, 0.1);
+  display: grid;
+  gap: 10px;
+}
+
+.timeline-add-form h4 {
+  margin: 0;
+}
+
 .message-card {
   padding: 14px 16px;
 }

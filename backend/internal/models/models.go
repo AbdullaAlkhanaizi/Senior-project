@@ -87,6 +87,11 @@ type CaseDecisionRequest struct {
 	Note     string `json:"note"`
 }
 
+type UpsertCaseUpdateRequest struct {
+	Label string `json:"label"`
+	State string `json:"state"`
+}
+
 type CreateMessageRequest struct {
 	SenderType string `json:"senderType"`
 	SenderName string `json:"senderName"`

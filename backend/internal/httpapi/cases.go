@@ -142,6 +142,8 @@ func (s *Server) handleCaseRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleCaseAttachments(w, r, caseID, current)
 	case "decision":
 		s.handleCaseDecision(w, r, caseID, current)
+	case "updates":
+		s.handleCaseUpdates(w, r, caseID, parts, current)
 	default:
 		writeError(w, http.StatusNotFound, "not found")
 	}
@@ -257,6 +259,93 @@ func (s *Server) handleCaseDecision(w http.ResponseWriter, r *http.Request, case
 	}
 
 	writeJSON(w, http.StatusOK, details)
+}
+
+func (s *Server) handleCaseUpdates(w http.ResponseWriter, r *http.Request, caseID int64, parts []string, current *viewer) {
+	if current.Role != models.RoleLawyer {
+		writeError(w, http.StatusForbidden, "only lawyers can manage case steps")
+		return
+	}
+
+	if len(parts) == 2 {
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+
+		var req models.UpsertCaseUpdateRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid json body")
+			return
+		}
+
+		details, err := s.store.CreateCaseUpdate(r.Context(), caseID, req)
+		if err != nil {
+			if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "invalid state") {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			if errors.Is(err, sql.ErrNoRows) {
+				writeError(w, http.StatusNotFound, "case not found")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusCreated, details)
+		return
+	}
+
+	if len(parts) != 3 {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+
+	updateID, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid update id")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPut:
+		var req models.UpsertCaseUpdateRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid json body")
+			return
+		}
+
+		details, err := s.store.UpdateCaseUpdate(r.Context(), caseID, updateID, req)
+		if err != nil {
+			if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "invalid state") {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			if errors.Is(err, sql.ErrNoRows) {
+				writeError(w, http.StatusNotFound, "step not found")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, details)
+	case http.MethodDelete:
+		details, err := s.store.DeleteCaseUpdate(r.Context(), caseID, updateID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				writeError(w, http.StatusNotFound, "step not found")
+				return
+			}
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, details)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
 }
 
 func senderIdentity(current *viewer) (string, string) {

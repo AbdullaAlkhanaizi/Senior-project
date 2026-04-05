@@ -119,3 +119,29 @@ export async function uploadCaseAttachment(caseId, formData) {
   });
   return parseJSON(response);
 }
+
+export async function createCaseStep(caseId, payload) {
+  const response = await fetch(`${API_BASE}/api/cases/${caseId}/updates`, {
+    method: "POST",
+    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload)
+  });
+  return parseJSON(response);
+}
+
+export async function updateCaseStep(caseId, stepId, payload) {
+  const response = await fetch(`${API_BASE}/api/cases/${caseId}/updates/${stepId}`, {
+    method: "PUT",
+    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload)
+  });
+  return parseJSON(response);
+}
+
+export async function deleteCaseStep(caseId, stepId) {
+  const response = await fetch(`${API_BASE}/api/cases/${caseId}/updates/${stepId}`, {
+    method: "DELETE",
+    headers: withAuthHeaders()
+  });
+  return parseJSON(response);
+}

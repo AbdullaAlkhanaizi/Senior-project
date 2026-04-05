@@ -474,6 +474,130 @@ func (s *Store) CreateMessage(ctx context.Context, caseID int64, req models.Crea
 	}, nil
 }
 
+func (s *Store) CreateCaseUpdate(ctx context.Context, caseID int64, req models.UpsertCaseUpdateRequest) (models.CaseDetails, error) {
+	label := strings.TrimSpace(req.Label)
+	if label == "" {
+		return models.CaseDetails{}, errors.New("step label is required")
+	}
+	if !isValidCaseUpdateState(req.State) {
+		return models.CaseDetails{}, errors.New("invalid state; use completed, current, or upcoming")
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return models.CaseDetails{}, err
+	}
+	defer tx.Rollback()
+
+	var nextSortOrder int
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(MAX(sort_order), 0) + 1
+		FROM case_updates
+		WHERE case_id = ?`, caseID).Scan(&nextSortOrder); err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO case_updates (case_id, label, state, sort_order, created_at)
+		VALUES (?, ?, ?, ?, ?)`,
+		caseID, label, normalizeCaseUpdateState(req.State), nextSortOrder, time.Now().UTC().Format(timeLayout),
+	); err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	if err := syncCaseProgress(ctx, tx, caseID); err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	return s.LoadCaseDetails(ctx, caseID)
+}
+
+func (s *Store) UpdateCaseUpdate(ctx context.Context, caseID, updateID int64, req models.UpsertCaseUpdateRequest) (models.CaseDetails, error) {
+	label := strings.TrimSpace(req.Label)
+	if label == "" {
+		return models.CaseDetails{}, errors.New("step label is required")
+	}
+	if !isValidCaseUpdateState(req.State) {
+		return models.CaseDetails{}, errors.New("invalid state; use completed, current, or upcoming")
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return models.CaseDetails{}, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.ExecContext(ctx, `
+		UPDATE case_updates
+		SET label = ?, state = ?
+		WHERE id = ? AND case_id = ?`,
+		label, normalizeCaseUpdateState(req.State), updateID, caseID,
+	)
+	if err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return models.CaseDetails{}, err
+	}
+	if rowsAffected == 0 {
+		return models.CaseDetails{}, sql.ErrNoRows
+	}
+
+	if err := syncCaseProgress(ctx, tx, caseID); err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	return s.LoadCaseDetails(ctx, caseID)
+}
+
+func (s *Store) DeleteCaseUpdate(ctx context.Context, caseID, updateID int64) (models.CaseDetails, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return models.CaseDetails{}, err
+	}
+	defer tx.Rollback()
+
+	result, err := tx.ExecContext(ctx, `
+		DELETE FROM case_updates
+		WHERE id = ? AND case_id = ?`,
+		updateID, caseID,
+	)
+	if err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return models.CaseDetails{}, err
+	}
+	if rowsAffected == 0 {
+		return models.CaseDetails{}, sql.ErrNoRows
+	}
+
+	if err := resequenceCaseUpdates(ctx, tx, caseID); err != nil {
+		return models.CaseDetails{}, err
+	}
+	if err := syncCaseProgress(ctx, tx, caseID); err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	return s.LoadCaseDetails(ctx, caseID)
+}
+
 func seedCaseTimeline(ctx context.Context, runner dbRunner, caseID int64, decisionStatus, createdAt string) error {
 	if _, err := runner.ExecContext(ctx, `DELETE FROM case_updates WHERE case_id = ?`, caseID); err != nil {
 		return err
@@ -555,6 +679,77 @@ func calculateProgressPercent(completedTasks, totalTasks int) int {
 	}
 
 	return int(math.Round((float64(completedTasks) / float64(totalTasks)) * 100))
+}
+
+func syncCaseProgress(ctx context.Context, runner dbRunner, caseID int64) error {
+	var completedTasks int
+	var totalTasks int
+	if err := runner.QueryRowContext(ctx, `
+		SELECT
+			COALESCE(SUM(CASE WHEN state = 'completed' THEN 1 ELSE 0 END), 0),
+			COUNT(*)
+		FROM case_updates
+		WHERE case_id = ?`, caseID).Scan(&completedTasks, &totalTasks); err != nil {
+		return err
+	}
+
+	_, err := runner.ExecContext(ctx, `
+		UPDATE cases
+		SET progress_percent = ?
+		WHERE id = ?`,
+		calculateProgressPercent(completedTasks, totalTasks), caseID,
+	)
+	return err
+}
+
+func resequenceCaseUpdates(ctx context.Context, runner dbRunner, caseID int64) error {
+	rows, err := runner.QueryContext(ctx, `
+		SELECT id
+		FROM case_updates
+		WHERE case_id = ?
+		ORDER BY sort_order ASC, id ASC`, caseID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var updateIDs []int64
+	for rows.Next() {
+		var updateID int64
+		if err := rows.Scan(&updateID); err != nil {
+			return err
+		}
+		updateIDs = append(updateIDs, updateID)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for index, updateID := range updateIDs {
+		if _, err := runner.ExecContext(ctx, `
+			UPDATE case_updates
+			SET sort_order = ?
+			WHERE id = ? AND case_id = ?`,
+			index+1, updateID, caseID,
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func normalizeCaseUpdateState(state string) string {
+	return strings.ToLower(strings.TrimSpace(state))
+}
+
+func isValidCaseUpdateState(state string) bool {
+	switch normalizeCaseUpdateState(state) {
+	case "completed", "current", "upcoming":
+		return true
+	default:
+		return false
+	}
 }
 
 func buildCaseTitle(title, summary string) string {

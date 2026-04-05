@@ -5,14 +5,29 @@ import { useEffect, useMemo, useState } from "react";
 import {
   API_BASE,
   createCase,
+  createCaseStep,
+  deleteCaseStep,
   decideCase,
   getCaseDetails,
   getCases,
   getDashboard,
   sendCaseMessage,
+  updateCaseStep,
   uploadCaseAttachment
 } from "../lib/api";
 import { loadSession } from "../lib/session";
+
+const STEP_STATE_OPTIONS = ["completed", "current", "upcoming"];
+
+function buildStepDrafts(updates = []) {
+  return updates.reduce((drafts, step) => {
+    drafts[step.id] = {
+      label: step.label,
+      state: step.state
+    };
+    return drafts;
+  }, {});
+}
 
 export default function MessagingClient() {
   const [session, setSession] = useState(null);
@@ -28,6 +43,8 @@ export default function MessagingClient() {
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [loadingCases, setLoadingCases] = useState(true);
+  const [stepDrafts, setStepDrafts] = useState({});
+  const [newStep, setNewStep] = useState({ label: "", state: "upcoming" });
 
   useEffect(() => {
     const currentSession = loadSession();
@@ -67,6 +84,10 @@ export default function MessagingClient() {
 
     load();
   }, []);
+
+  useEffect(() => {
+    setStepDrafts(buildStepDrafts(activeCase?.updates || []));
+  }, [activeCase]);
 
   const role = session?.role || "guest";
   const isAdmin = role === "admin";
@@ -225,6 +246,80 @@ export default function MessagingClient() {
     }
   }
 
+  function updateStepDraft(stepId, field, value) {
+    setStepDrafts((current) => ({
+      ...current,
+      [stepId]: {
+        ...(current[stepId] || {}),
+        [field]: value
+      }
+    }));
+  }
+
+  async function handleStepSave(stepId) {
+    if (!isLawyer || !activeCase?.case?.id) {
+      return;
+    }
+
+    const draft = stepDrafts[stepId];
+    if (!draft) {
+      return;
+    }
+
+    setError("");
+    setStatus("Saving case step...");
+
+    try {
+      const details = await updateCaseStep(activeCase.case.id, stepId, draft);
+      setActiveCase(details);
+      await refreshCases(details.case.id);
+      setStatus("Case step updated.");
+    } catch (requestError) {
+      setError(requestError.message);
+      setStatus("");
+    }
+  }
+
+  async function handleStepDelete(stepId) {
+    if (!isLawyer || !activeCase?.case?.id) {
+      return;
+    }
+
+    setError("");
+    setStatus("Removing case step...");
+
+    try {
+      const details = await deleteCaseStep(activeCase.case.id, stepId);
+      setActiveCase(details);
+      await refreshCases(details.case.id);
+      setStatus("Case step removed.");
+    } catch (requestError) {
+      setError(requestError.message);
+      setStatus("");
+    }
+  }
+
+  async function handleStepCreate(event) {
+    event.preventDefault();
+    if (!isLawyer || !activeCase?.case?.id) {
+      return;
+    }
+
+    setError("");
+    setStatus("Adding case step...");
+
+    try {
+      const details = await createCaseStep(activeCase.case.id, newStep);
+      setActiveCase(details);
+      setNewStep({ label: "", state: "upcoming" });
+      await refreshCases(details.case.id);
+      setStatus("Case step added.");
+    } catch (requestError) {
+      setError(requestError.message);
+      setStatus("");
+    }
+  }
+
   if (isAdmin) {
     return (
       <section className="grid lower-grid">
@@ -374,15 +469,74 @@ export default function MessagingClient() {
                 </div>
                 <div className="timeline">
                   {activeCase.updates.map((step) => (
-                    <article key={step.id} className={`timeline-step ${step.state}`}>
-                      <span />
-                      <div>
-                        <h4>{step.label}</h4>
-                        <p>{step.state}</p>
-                      </div>
-                    </article>
+                    isLawyer ? (
+                      <form
+                        key={step.id}
+                        className={`timeline-step timeline-step-editor ${step.state}`}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          handleStepSave(step.id);
+                        }}
+                      >
+                        <span />
+                        <div className="timeline-step-editor-body">
+                          <input
+                            value={stepDrafts[step.id]?.label || ""}
+                            onChange={(event) => updateStepDraft(step.id, "label", event.target.value)}
+                            placeholder="Step label"
+                          />
+                          <div className="timeline-step-editor-actions">
+                            <select
+                              value={stepDrafts[step.id]?.state || "upcoming"}
+                              onChange={(event) => updateStepDraft(step.id, "state", event.target.value)}
+                            >
+                              {STEP_STATE_OPTIONS.map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                              ))}
+                            </select>
+                            <button type="submit">Save</button>
+                            <button
+                              type="button"
+                              className="button-secondary"
+                              onClick={() => handleStepDelete(step.id)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+                    ) : (
+                      <article key={step.id} className={`timeline-step ${step.state}`}>
+                        <span />
+                        <div>
+                          <h4>{step.label}</h4>
+                          <p>{step.state}</p>
+                        </div>
+                      </article>
+                    )
                   ))}
                 </div>
+                {isLawyer ? (
+                  <form className="timeline-add-form" onSubmit={handleStepCreate}>
+                    <h4>Add case step</h4>
+                    <input
+                      value={newStep.label}
+                      onChange={(event) => setNewStep((current) => ({ ...current, label: event.target.value }))}
+                      placeholder="New step label"
+                    />
+                    <div className="timeline-add-actions">
+                      <select
+                        value={newStep.state}
+                        onChange={(event) => setNewStep((current) => ({ ...current, state: event.target.value }))}
+                      >
+                        {STEP_STATE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                      <button type="submit">Add step</button>
+                    </div>
+                  </form>
+                ) : null}
               </div>
 
               <div className="message-feed">
