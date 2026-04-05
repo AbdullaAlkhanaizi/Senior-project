@@ -45,6 +45,8 @@ export default function MessagingClient() {
   const [loadingCases, setLoadingCases] = useState(true);
   const [stepDrafts, setStepDrafts] = useState({});
   const [newStep, setNewStep] = useState({ label: "", state: "upcoming" });
+  const [showCreateCaseForm, setShowCreateCaseForm] = useState(false);
+  const [clientView, setClientView] = useState("list");
 
   useEffect(() => {
     const currentSession = loadSession();
@@ -132,6 +134,9 @@ export default function MessagingClient() {
       const details = await getCaseDetails(caseId);
       setSelectedCaseId(caseId);
       setActiveCase(details);
+      if (isClient) {
+        setClientView("details");
+      }
       setDecisionNote("");
       setStatus("");
     } catch (requestError) {
@@ -159,6 +164,8 @@ export default function MessagingClient() {
       setIssueSummary("");
       setSelectedCaseId(data.case.id);
       setActiveCase(data);
+      setShowCreateCaseForm(false);
+      setClientView("list");
       await refreshCases(data.case.id);
       setStatus(`Case request sent to ${data.lawyer.name}.`);
     } catch (requestError) {
@@ -338,6 +345,209 @@ export default function MessagingClient() {
     );
   }
 
+  if (isClient) {
+    return (
+      <>
+        {error ? <p className="feedback error">{error}</p> : null}
+        {status ? <p className="feedback">{status}</p> : null}
+
+        <section className="grid lower-grid single-panel-grid client-messaging-grid">
+          {clientView === "list" ? (
+            <div className="panel referral-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">Your cases</p>
+                  <h2>Open a case or start a new request</h2>
+                </div>
+              </div>
+
+              <div className="case-list">
+                {loadingCases ? (
+                  <p className="muted">Loading cases...</p>
+                ) : cases.length > 0 ? (
+                  cases.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`case-list-item ${selectedCaseId === item.id ? "selected" : ""}`}
+                      onClick={() => handleSelectCase(item.id)}
+                    >
+                      <div className="case-list-top">
+                        <strong>{item.title}</strong>
+                        <strong>{item.progressPercent}%</strong>
+                      </div>
+                      <p>{item.lawyerName}</p>
+                      <div className="case-list-progress-bar">
+                        <div style={{ width: `${item.progressPercent}%` }} />
+                      </div>
+                      <small>{item.status}</small>
+                    </button>
+                  ))
+                ) : (
+                  <p className="muted">No cases yet.</p>
+                )}
+              </div>
+
+              <div className="client-case-launcher">
+                <button
+                  type="button"
+                  className={showCreateCaseForm ? "button-secondary" : ""}
+                  onClick={() => setShowCreateCaseForm((current) => !current)}
+                >
+                  {showCreateCaseForm ? "Close new case request" : "Create new case"}
+                </button>
+
+                {showCreateCaseForm ? (
+                  <div className="client-case-drawer">
+                    <div className="client-case-drawer-header">
+                      <div>
+                        <p className="panel-kicker">New request</p>
+                        <h3>Pick a lawyer and ask for representation</h3>
+                      </div>
+                    </div>
+
+                    <div className="lawyer-grid">
+                      {lawyers.map((lawyer) => (
+                        <button
+                          key={lawyer.id}
+                          type="button"
+                          className={`lawyer-card ${Number(selectedLawyerId) === lawyer.id ? "selected" : ""}`}
+                          onClick={() => setSelectedLawyerId(lawyer.id)}
+                        >
+                          <strong>{lawyer.name}</strong>
+                          <span>{lawyer.firm}</span>
+                          <p>{lawyer.specialty}</p>
+                          <small>{lawyer.city}</small>
+                        </button>
+                      ))}
+                    </div>
+
+                    {selectedLawyer ? (
+                      <div className="selected-lawyer">
+                        <h3>{selectedLawyer.name}</h3>
+                        <p>{selectedLawyer.bio}</p>
+                        <p>{selectedLawyer.email}</p>
+                        <p>{selectedLawyer.phone}</p>
+                      </div>
+                    ) : null}
+
+                    <form className="referral-form" onSubmit={handleCaseCreate}>
+                      <textarea
+                        value={issueSummary}
+                        onChange={(event) => setIssueSummary(event.target.value)}
+                        placeholder="Describe your issue so the lawyer can review and decide whether to accept the case."
+                      />
+                      <button type="submit">Send case request</button>
+                    </form>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : activeCase ? (
+            <div className="panel messaging-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">Case workspace</p>
+                  <h2>{caseLabel}</h2>
+                </div>
+                <button type="button" className="button-secondary panel-back-button" onClick={() => setClientView("list")}>
+                  Back to cases
+                </button>
+              </div>
+
+              <div className="progress-card">
+                <div className="progress-meta">
+                  <div>
+                    <p className="muted">Issue summary</p>
+                    <h3>{activeCase.case.title}</h3>
+                  </div>
+                  <strong>{activeCase.case.progressPercent}%</strong>
+                </div>
+                <p className="case-summary-text">{activeCase.case.summary}</p>
+                <div className="case-meta-row">
+                  <span className={`mini-status ${activeCase.case.decisionStatus}`}>{activeCase.case.decisionStatus}</span>
+                  <span>{new Date(activeCase.case.createdAt).toLocaleString()}</span>
+                </div>
+                {activeCase.case.decisionNote ? (
+                  <p className="case-note"><strong>Lawyer note:</strong> {activeCase.case.decisionNote}</p>
+                ) : null}
+                <div className="progress-bar">
+                  <div style={{ width: `${activeCase.case.progressPercent}%` }} />
+                </div>
+                <div className="timeline">
+                  {activeCase.updates.map((step) => (
+                    <article key={step.id} className={`timeline-step ${step.state}`}>
+                      <span />
+                      <div>
+                        <h4>{step.label}</h4>
+                        <p>{step.state}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+
+              <div className="message-feed">
+                {activeCase.messages.map((item) => (
+                  <article key={item.id} className={`message-card ${item.senderType}`}>
+                    <div className="message-meta">
+                      <strong>{item.senderName}</strong>
+                      <span>{new Date(item.createdAt).toLocaleString()}</span>
+                    </div>
+                    <p>{item.body}</p>
+                    {item.attachmentUrl ? (
+                      <a href={`${API_BASE}${item.attachmentUrl}`} target="_blank" rel="noreferrer">
+                        {item.attachmentName}
+                      </a>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+
+              {canMessage ? (
+                <form className="message-form" onSubmit={handleMessageSend}>
+                  <textarea
+                    value={messageInput}
+                    onChange={(event) => setMessageInput(event.target.value)}
+                    placeholder="Send a message to your lawyer"
+                  />
+                  <div className="message-actions">
+                    <label className={`upload-button ${uploading ? "disabled" : ""}`}>
+                      <input type="file" onChange={handleUpload} disabled={uploading} />
+                      Upload file
+                    </label>
+                    <button type="submit">Send message</button>
+                  </div>
+                </form>
+              ) : (
+                <p className="hero-copy">
+                  {activeCase.case.decisionStatus === "pending"
+                    ? "Messaging opens after the lawyer accepts the case."
+                    : activeCase.case.decisionStatus === "declined"
+                      ? "This request was declined. Create a new request with another lawyer to continue."
+                      : "Sign in to continue."}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="panel messaging-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-kicker">Case workspace</p>
+                  <h2>No case selected</h2>
+                </div>
+                <button type="button" className="button-secondary panel-back-button" onClick={() => setClientView("list")}>
+                  Back to cases
+                </button>
+              </div>
+              <p className="muted">Select one of your cases to open the workspace.</p>
+            </div>
+          )}
+        </section>
+      </>
+    );
+  }
+
   return (
     <>
       {error ? <p className="feedback error">{error}</p> : null}
@@ -347,8 +557,8 @@ export default function MessagingClient() {
         <div className="panel referral-panel">
           <div className="panel-header">
             <div>
-              <p className="panel-kicker">{isLawyer ? "Case inbox" : "Request a lawyer"}</p>
-              <h2>{isLawyer ? "Assigned case requests" : "Choose a lawyer and describe the issue"}</h2>
+              <p className="panel-kicker">{isLawyer ? "Case inbox" : isClient ? "Your cases" : "Request a lawyer"}</p>
+              <h2>{isLawyer ? "Assigned case requests" : isClient ? "Open a case or start a new request" : "Choose a lawyer and describe the issue"}</h2>
             </div>
           </div>
 
@@ -365,10 +575,23 @@ export default function MessagingClient() {
                 >
                   <div className="case-list-top">
                     <strong>{item.title}</strong>
-                    <span className={`mini-status ${item.decisionStatus}`}>{item.decisionStatus}</span>
+                    {isClient ? (
+                      <strong>{item.progressPercent}%</strong>
+                    ) : (
+                      <span className={`mini-status ${item.decisionStatus}`}>{item.decisionStatus}</span>
+                    )}
                   </div>
                   <p>{isLawyer ? item.clientName : item.lawyerName}</p>
-                  <small>{item.status}</small>
+                  {isClient ? (
+                    <>
+                      <div className="case-list-progress-bar">
+                        <div style={{ width: `${item.progressPercent}%` }} />
+                      </div>
+                      <small>{item.status}</small>
+                    </>
+                  ) : (
+                    <small>{item.status}</small>
+                  )}
                 </button>
               ))
             ) : (
@@ -377,41 +600,60 @@ export default function MessagingClient() {
           </div>
 
           {isClient ? (
-            <>
-              <div className="lawyer-grid">
-                {lawyers.map((lawyer) => (
-                  <button
-                    key={lawyer.id}
-                    type="button"
-                    className={`lawyer-card ${Number(selectedLawyerId) === lawyer.id ? "selected" : ""}`}
-                    onClick={() => setSelectedLawyerId(lawyer.id)}
-                  >
-                    <strong>{lawyer.name}</strong>
-                    <span>{lawyer.firm}</span>
-                    <p>{lawyer.specialty}</p>
-                    <small>{lawyer.city}</small>
-                  </button>
-                ))}
-              </div>
+            <div className="client-case-launcher">
+              <button
+                type="button"
+                className={showCreateCaseForm ? "button-secondary" : ""}
+                onClick={() => setShowCreateCaseForm((current) => !current)}
+              >
+                {showCreateCaseForm ? "Close new case request" : "Create new case"}
+              </button>
 
-              {selectedLawyer ? (
-                <div className="selected-lawyer">
-                  <h3>{selectedLawyer.name}</h3>
-                  <p>{selectedLawyer.bio}</p>
-                  <p>{selectedLawyer.email}</p>
-                  <p>{selectedLawyer.phone}</p>
+              {showCreateCaseForm ? (
+                <div className="client-case-drawer">
+                  <div className="client-case-drawer-header">
+                    <div>
+                      <p className="panel-kicker">New request</p>
+                      <h3>Pick a lawyer and ask for representation</h3>
+                    </div>
+                  </div>
+
+                  <div className="lawyer-grid">
+                    {lawyers.map((lawyer) => (
+                      <button
+                        key={lawyer.id}
+                        type="button"
+                        className={`lawyer-card ${Number(selectedLawyerId) === lawyer.id ? "selected" : ""}`}
+                        onClick={() => setSelectedLawyerId(lawyer.id)}
+                      >
+                        <strong>{lawyer.name}</strong>
+                        <span>{lawyer.firm}</span>
+                        <p>{lawyer.specialty}</p>
+                        <small>{lawyer.city}</small>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedLawyer ? (
+                    <div className="selected-lawyer">
+                      <h3>{selectedLawyer.name}</h3>
+                      <p>{selectedLawyer.bio}</p>
+                      <p>{selectedLawyer.email}</p>
+                      <p>{selectedLawyer.phone}</p>
+                    </div>
+                  ) : null}
+
+                  <form className="referral-form" onSubmit={handleCaseCreate}>
+                    <textarea
+                      value={issueSummary}
+                      onChange={(event) => setIssueSummary(event.target.value)}
+                      placeholder="Describe your issue so the lawyer can review and decide whether to accept the case."
+                    />
+                    <button type="submit">Send case request</button>
+                  </form>
                 </div>
               ) : null}
-
-              <form className="referral-form" onSubmit={handleCaseCreate}>
-                <textarea
-                  value={issueSummary}
-                  onChange={(event) => setIssueSummary(event.target.value)}
-                  placeholder="Describe your issue so the lawyer can review and decide whether to accept the case."
-                />
-                <button type="submit">Send case request</button>
-              </form>
-            </>
+            </div>
           ) : isLawyer && activeCase?.case?.decisionStatus === "pending" ? (
             <div className="decision-panel">
               <p className="hero-copy">
@@ -585,7 +827,9 @@ export default function MessagingClient() {
             <p className="muted">
               {isLawyer
                 ? "No case requests have been assigned to this lawyer account yet."
-                : "Choose a lawyer and submit your issue to start a case request."}
+                : isClient
+                  ? "Select one of your cases to open the workspace, or create a new case request."
+                  : "Choose a lawyer and submit your issue to start a case request."}
             </p>
           )}
         </div>

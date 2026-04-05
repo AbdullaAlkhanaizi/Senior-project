@@ -345,6 +345,15 @@ a:focus-visible,
   grid-template-columns: 0.9fr 1.1fr;
 }
 
+.single-panel-grid {
+  grid-template-columns: 1fr;
+}
+
+.client-messaging-grid {
+  width: min(100%, 60vw);
+  margin-inline: auto;
+}
+
 .panel {
   padding: 24px;
 }
@@ -5450,6 +5459,21 @@ a.sm-btn:hover {
   margin: 8px 0 0;
 }
 
+.case-list-progress-bar {
+  width: 100%;
+  height: 8px;
+  margin-top: 12px;
+  border-radius: 999px;
+  background: rgba(31, 35, 31, 0.08);
+  overflow: hidden;
+}
+
+.case-list-progress-bar div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--sage), var(--accent));
+}
+
 .case-list-top,
 .case-meta-row,
 .decision-actions {
@@ -5463,6 +5487,30 @@ a.sm-btn:hover {
   margin-top: 14px;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.client-case-launcher {
+  display: grid;
+  gap: 16px;
+}
+
+.client-case-drawer {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(31, 35, 31, 0.1);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(140deg, rgba(255, 252, 246, 0.98), rgba(255, 245, 234, 0.92));
+  box-shadow: var(--shadow-card);
+}
+
+.client-case-drawer-header h3 {
+  margin: 6px 0 0;
+}
+
+.panel-back-button {
+  flex-shrink: 0;
 }
 
 .mini-status {
@@ -6026,6 +6074,10 @@ a.sm-btn:hover {
 }
 
 @media (max-width: 900px) {
+  .client-messaging-grid {
+    width: 100%;
+  }
+
   .portal-account-strip {
     width: 100%;
     justify-content: flex-end;
