@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
 	"strings"
 	"time"
@@ -68,10 +69,18 @@ func (s *Store) ListLawyers(ctx context.Context) ([]models.Lawyer, error) {
 
 func (s *Store) ListCases(ctx context.Context) ([]models.CaseSummary, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT c.id, c.title, c.summary, c.status, c.decision_status, c.decision_note, c.progress_percent,
+		SELECT c.id, c.title, c.summary, c.status, c.decision_status, c.decision_note,
+		       COALESCE(u.completed_tasks, 0), COALESCE(u.total_tasks, 0),
 		       c.client_name, COALESCE(c.client_user_id, 0), c.lawyer_id, l.name, c.created_at, COALESCE(c.responded_at, '')
 		FROM cases c
 		JOIN lawyers l ON l.id = c.lawyer_id
+		LEFT JOIN (
+			SELECT case_id,
+			       SUM(CASE WHEN state = 'completed' THEN 1 ELSE 0 END) AS completed_tasks,
+			       COUNT(*) AS total_tasks
+			FROM case_updates
+			GROUP BY case_id
+		) u ON u.case_id = c.id
 		ORDER BY datetime(c.created_at) DESC, c.id DESC`)
 	if err != nil {
 		return nil, err
@@ -81,6 +90,8 @@ func (s *Store) ListCases(ctx context.Context) ([]models.CaseSummary, error) {
 	var items []models.CaseSummary
 	for rows.Next() {
 		var item models.CaseSummary
+		var completedTasks int
+		var totalTasks int
 		if err := rows.Scan(
 			&item.ID,
 			&item.Title,
@@ -88,7 +99,8 @@ func (s *Store) ListCases(ctx context.Context) ([]models.CaseSummary, error) {
 			&item.Status,
 			&item.DecisionStatus,
 			&item.DecisionNote,
-			&item.ProgressPercent,
+			&completedTasks,
+			&totalTasks,
 			&item.ClientName,
 			&item.ClientUserID,
 			&item.LawyerID,
@@ -98,6 +110,7 @@ func (s *Store) ListCases(ctx context.Context) ([]models.CaseSummary, error) {
 		); err != nil {
 			return nil, err
 		}
+		item.ProgressPercent = calculateProgressPercent(completedTasks, totalTasks)
 		items = append(items, item)
 	}
 
@@ -108,7 +121,7 @@ func (s *Store) LoadCaseDetails(ctx context.Context, caseID int64) (models.CaseD
 	var details models.CaseDetails
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT c.id, c.title, c.summary, c.status, c.decision_status, c.decision_note, c.progress_percent,
+		SELECT c.id, c.title, c.summary, c.status, c.decision_status, c.decision_note,
 		       c.client_name, COALESCE(c.client_user_id, 0), c.lawyer_id, c.created_at, COALESCE(c.responded_at, ''),
 		       l.id, COALESCE(l.user_id, 0), l.name, l.firm, l.specialty, l.city, l.email, l.phone, l.bio
 		FROM cases c
@@ -120,7 +133,6 @@ func (s *Store) LoadCaseDetails(ctx context.Context, caseID int64) (models.CaseD
 		&details.Case.Status,
 		&details.Case.DecisionStatus,
 		&details.Case.DecisionNote,
-		&details.Case.ProgressPercent,
 		&details.Case.ClientName,
 		&details.Case.ClientUserID,
 		&details.Case.LawyerID,
@@ -161,6 +173,7 @@ func (s *Store) LoadCaseDetails(ctx context.Context, caseID int64) (models.CaseD
 	if err := updateRows.Err(); err != nil {
 		return models.CaseDetails{}, err
 	}
+	details.Case.ProgressPercent = calculateProgressFromCaseUpdates(details.Updates)
 
 	messageRows, err := s.db.QueryContext(ctx, `
 		SELECT id, case_id, sender_type, sender_name, body, attachment_name, attachment_path, created_at
@@ -300,6 +313,7 @@ func (s *Store) CreateCase(ctx context.Context, req models.CreateCaseRequest) (m
 	if summary == "" {
 		return models.CaseDetails{}, errors.New("issue description is required")
 	}
+	progressPercent := calculateProgressFromTimelineSteps(buildCaseTimeline("pending"))
 
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO cases (title, summary, status, decision_status, decision_note, progress_percent, client_name, client_user_id, lawyer_id, created_at, responded_at)
@@ -308,7 +322,7 @@ func (s *Store) CreateCase(ctx context.Context, req models.CreateCaseRequest) (m
 		summary,
 		"Pending lawyer review",
 		"pending",
-		15,
+		progressPercent,
 		req.ClientName,
 		req.ClientUserID,
 		req.LawyerID,
@@ -377,22 +391,21 @@ func (s *Store) DecideCase(ctx context.Context, caseID int64, actorName string, 
 
 	now := time.Now().UTC().Format(timeLayout)
 	status := "Accepted by lawyer"
-	progress := 45
 	systemBody := fmt.Sprintf("%s accepted the case.", actorName)
 	if decision == "declined" {
 		status = "Declined by lawyer"
-		progress = 70
 		systemBody = fmt.Sprintf("%s declined the case.", actorName)
 	}
 	if note := strings.TrimSpace(req.Note); note != "" {
 		systemBody = fmt.Sprintf("%s %s the case. Note: %s", actorName, decision, note)
 	}
+	progressPercent := calculateProgressFromTimelineSteps(buildCaseTimeline(decision))
 
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE cases
 		SET status = ?, decision_status = ?, decision_note = ?, progress_percent = ?, responded_at = ?
 		WHERE id = ?`,
-		status, decision, strings.TrimSpace(req.Note), progress, now, caseID,
+		status, decision, strings.TrimSpace(req.Note), progressPercent, now, caseID,
 	); err != nil {
 		return models.CaseDetails{}, err
 	}
@@ -466,35 +479,7 @@ func seedCaseTimeline(ctx context.Context, runner dbRunner, caseID int64, decisi
 		return err
 	}
 
-	type step struct {
-		Label string
-		State string
-		Order int
-	}
-
-	var steps []step
-	switch decisionStatus {
-	case "accepted":
-		steps = []step{
-			{Label: "Case request submitted", State: "completed", Order: 1},
-			{Label: "Lawyer accepted", State: "completed", Order: 2},
-			{Label: "Client-lawyer messaging open", State: "current", Order: 3},
-		}
-	case "declined":
-		steps = []step{
-			{Label: "Case request submitted", State: "completed", Order: 1},
-			{Label: "Lawyer declined", State: "completed", Order: 2},
-			{Label: "Choose another lawyer", State: "current", Order: 3},
-		}
-	default:
-		steps = []step{
-			{Label: "Case request submitted", State: "completed", Order: 1},
-			{Label: "Awaiting lawyer decision", State: "current", Order: 2},
-			{Label: "Messaging opens after acceptance", State: "upcoming", Order: 3},
-		}
-	}
-
-	for _, item := range steps {
+	for _, item := range buildCaseTimeline(decisionStatus) {
 		if _, err := runner.ExecContext(ctx, `
 			INSERT INTO case_updates (case_id, label, state, sort_order, created_at)
 			VALUES (?, ?, ?, ?, ?)`,
@@ -505,6 +490,71 @@ func seedCaseTimeline(ctx context.Context, runner dbRunner, caseID int64, decisi
 	}
 
 	return nil
+}
+
+type caseTimelineStep struct {
+	Label string
+	State string
+	Order int
+}
+
+func buildCaseTimeline(decisionStatus string) []caseTimelineStep {
+	switch decisionStatus {
+	case "accepted":
+		return []caseTimelineStep{
+			{Label: "Case request submitted", State: "completed", Order: 1},
+			{Label: "Lawyer accepted", State: "completed", Order: 2},
+			{Label: "Client-lawyer messaging open", State: "current", Order: 3},
+		}
+	case "declined":
+		return []caseTimelineStep{
+			{Label: "Case request submitted", State: "completed", Order: 1},
+			{Label: "Lawyer declined", State: "completed", Order: 2},
+			{Label: "Choose another lawyer", State: "current", Order: 3},
+		}
+	default:
+		return []caseTimelineStep{
+			{Label: "Case request submitted", State: "completed", Order: 1},
+			{Label: "Awaiting lawyer decision", State: "current", Order: 2},
+			{Label: "Messaging opens after acceptance", State: "upcoming", Order: 3},
+		}
+	}
+}
+
+func calculateProgressFromTimelineSteps(steps []caseTimelineStep) int {
+	completedTasks := 0
+	for _, step := range steps {
+		if step.State == "completed" {
+			completedTasks++
+		}
+	}
+
+	return calculateProgressPercent(completedTasks, len(steps))
+}
+
+func calculateProgressFromCaseUpdates(updates []models.CaseUpdate) int {
+	completedTasks := 0
+	for _, update := range updates {
+		if update.State == "completed" {
+			completedTasks++
+		}
+	}
+
+	return calculateProgressPercent(completedTasks, len(updates))
+}
+
+func calculateProgressPercent(completedTasks, totalTasks int) int {
+	if totalTasks <= 0 {
+		return 0
+	}
+	if completedTasks < 0 {
+		completedTasks = 0
+	}
+	if completedTasks > totalTasks {
+		completedTasks = totalTasks
+	}
+
+	return int(math.Round((float64(completedTasks) / float64(totalTasks)) * 100))
 }
 
 func buildCaseTitle(title, summary string) string {

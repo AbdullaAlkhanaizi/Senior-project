@@ -314,6 +314,17 @@ func (s *Store) seedSampleCase(ctx context.Context, sampleClient models.AuthResp
 	defer tx.Rollback()
 
 	now := time.Now().UTC()
+	updateSeeds := []struct {
+		Label string
+		State string
+		Order int
+	}{
+		{Label: "Initial intake", State: "completed", Order: 1},
+		{Label: "Lawyer assigned", State: "completed", Order: 2},
+		{Label: "Document review", State: "current", Order: 3},
+		{Label: "Next action", State: "upcoming", Order: 4},
+	}
+	progressPercent := calculateProgressPercent(2, len(updateSeeds))
 	caseResult, err := tx.ExecContext(ctx, `
 		INSERT INTO cases (title, summary, status, decision_status, decision_note, progress_percent, client_name, client_user_id, lawyer_id, created_at, responded_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -322,7 +333,7 @@ func (s *Store) seedSampleCase(ctx context.Context, sampleClient models.AuthResp
 		"Review in progress",
 		"accepted",
 		"Documents received. Initial review started.",
-		55,
+		progressPercent,
 		sampleClient.Name,
 		sampleClient.ID,
 		lawyerID,
@@ -336,17 +347,6 @@ func (s *Store) seedSampleCase(ctx context.Context, sampleClient models.AuthResp
 	caseID, err := caseResult.LastInsertId()
 	if err != nil {
 		return err
-	}
-
-	updateSeeds := []struct {
-		Label string
-		State string
-		Order int
-	}{
-		{Label: "Initial intake", State: "completed", Order: 1},
-		{Label: "Lawyer assigned", State: "completed", Order: 2},
-		{Label: "Document review", State: "current", Order: 3},
-		{Label: "Next action", State: "upcoming", Order: 4},
 	}
 
 	for _, update := range updateSeeds {
