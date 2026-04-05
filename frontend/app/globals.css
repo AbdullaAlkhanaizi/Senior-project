@@ -833,6 +833,37 @@ button:active,
   transform: none;
 }
 
+.faq-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.faq-hero-panel,
+.faq-feature-card,
+.faq-stack {
+  width: min(100%, 60vw);
+  margin-inline: auto;
+}
+
+.faq-feature-card {
+  padding: 26px 28px;
+  text-align: center;
+}
+
+.faq-feature-card h3 {
+  margin-top: 12px;
+  font-size: clamp(1.5rem, 2vw, 2rem);
+}
+
+.faq-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.faq-list-card {
+  width: 100%;
+}
+
 .welcome-panel {
   min-height: 100%;
 }
