@@ -20,7 +20,7 @@ const ROLE_LABELS = {
   guest: "Guest"
 };
 
-export default function PortalShell({ title, description, hideHero, children }) {
+export default function PortalShell({ title, description, hideHero, showEyebrow = true, heroClassName = "", children }) {
   const pathname = usePathname() || "";
   const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -131,9 +131,9 @@ export default function PortalShell({ title, description, hideHero, children }) 
       </div>
 
       {!hideHero && (
-        <section className="hero compact">
+        <section className={`hero compact ${heroClassName}`.trim()}>
           <div>
-            <p className="eyebrow">Senior Project</p>
+            {showEyebrow ? <p className="eyebrow">Senior Project</p> : null}
             <h1>{title}</h1>
             <p className="hero-copy">{description}</p>
           </div>
