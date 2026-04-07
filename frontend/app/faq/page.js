@@ -6,6 +6,7 @@ export default function FAQPage() {
     <PortalShell
       title="Frequently asked questions"
       description="The FAQ page is separated from the chatbot and messaging flow so users can browse common legal questions directly."
+      hideHero
     >
       <FAQClient />
     </PortalShell>
