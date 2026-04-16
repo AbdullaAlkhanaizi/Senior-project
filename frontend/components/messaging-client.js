@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -16,6 +17,7 @@ import {
   updateCaseStep,
   uploadCaseAttachment
 } from "../lib/api";
+import { INITIAL_REVIEWS, getLawyerReviewSummary } from "../lib/reviews";
 import { loadSession } from "../lib/session";
 
 const STEP_STATE_OPTIONS = ["completed", "current", "upcoming"];
@@ -147,6 +149,13 @@ export default function MessagingClient() {
     return activeCase.lawyer.name;
   }, [activeCase, isLawyer]);
 
+  const lawyerReviewSummaries = useMemo(() => {
+    return lawyers.reduce((summaries, lawyer) => {
+      summaries[lawyer.name] = getLawyerReviewSummary(INITIAL_REVIEWS, lawyer.name);
+      return summaries;
+    }, {});
+  }, [lawyers]);
+
   function formatTimestamp(value) {
     return new Date(value).toLocaleString([], {
       month: "short",
@@ -163,6 +172,38 @@ export default function MessagingClient() {
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase() || "")
       .join("");
+  }
+
+  function getReviewHref(lawyerName = "") {
+    return `/review?lawyer=${encodeURIComponent(lawyerName)}`;
+  }
+
+  function renderStars(ratingValue) {
+    const rounded = Math.round(Number(ratingValue) || 0);
+
+    return (
+      <span className="lawyer-rating-stars" aria-label={`${rounded} star rating`}>
+        {[1, 2, 3, 4, 5].map((value) => (
+          <span key={value} className={value <= rounded ? "star-filled" : "star-empty"}>★</span>
+        ))}
+      </span>
+    );
+  }
+
+  function renderLawyerReviewSummary(lawyer) {
+    if (!lawyer) {
+      return null;
+    }
+
+    const summary = lawyerReviewSummaries[lawyer.name] || { average: 0, count: 0 };
+
+    return (
+      <div className="lawyer-review-summary">
+        {renderStars(summary.average)}
+        <span>{summary.average.toFixed(1)}</span>
+        <small>{summary.count} {summary.count === 1 ? "review" : "reviews"}</small>
+      </div>
+    );
   }
 
   function CaseReviewIcon() {
@@ -634,6 +675,176 @@ export default function MessagingClient() {
     );
   }
 
+  if (isGuest) {
+    return (
+      <>
+        {error ? <p className="feedback error">{error}</p> : null}
+        {status ? <p className="feedback">{status}</p> : null}
+
+        <section className="grid lower-grid single-panel-grid client-messaging-grid expanded guest-messaging-grid">
+          <div className="panel referral-panel client-cases-panel">
+            <div className="panel-header">
+              <div>
+                <p className="panel-kicker">Lawyer directory</p>
+                <h2>Browse available lawyers</h2>
+              </div>
+            </div>
+
+            <div className="case-list">
+              {loadingCases ? (
+                <p className="muted">Loading lawyers...</p>
+              ) : lawyers.length > 0 ? (
+                lawyers.map((lawyer) => (
+                  <button
+                    key={lawyer.id}
+                    type="button"
+                    className={`case-list-item case-faq-card ${Number(selectedLawyerId) === lawyer.id ? "selected" : ""}`}
+                    style={getLawyerTheme(lawyer.name)}
+                    onClick={() => setSelectedLawyerId(lawyer.id)}
+                  >
+                    <div className="case-faq-card-top">
+                      <span className="faq-tag case-faq-tag">{lawyer.specialty}</span>
+                      <p className="faq-priority case-review-cta">View profile</p>
+                    </div>
+
+                    <div className="case-faq-card-main">
+                      <div className="case-list-top">
+                        <strong>{lawyer.name}</strong>
+                        <strong>{getInitials(lawyer.name)}</strong>
+                      </div>
+                      <p>{lawyer.firm}</p>
+                      {renderLawyerReviewSummary(lawyer)}
+                      <div className="case-faq-card-footer">
+                        <small>{lawyer.city}</small>
+                        <span className="case-meta-pill">Guest preview</span>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <p className="muted">No lawyers are available right now.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="panel messaging-panel">
+            <div className="panel-header">
+              <div>
+                <p className="panel-kicker">Guest workspace</p>
+                <h2>{selectedLawyer ? selectedLawyer.name : "Choose a lawyer"}</h2>
+              </div>
+              <span className="badge">View only</span>
+            </div>
+
+            {selectedLawyer ? (
+              <div className="client-case-shell lawyer-case-shell">
+                <aside className="client-case-sidebar lawyer-case-sidebar">
+                  <div className="client-case-sidebar-header">
+                    <p className="panel-kicker">Preview flow</p>
+                    <h3>How access works</h3>
+                  </div>
+                  <div className="timeline">
+                    <article className="timeline-step completed">
+                      <span />
+                      <div>
+                        <h4>Browse lawyers</h4>
+                        <p>Compare firms and specializations in guest mode.</p>
+                      </div>
+                    </article>
+                    <article className="timeline-step current">
+                      <span />
+                      <div>
+                        <h4>Create a client account</h4>
+                        <p>Sign in to submit a matter for review.</p>
+                      </div>
+                    </article>
+                    <article className="timeline-step upcoming">
+                      <span />
+                      <div>
+                        <h4>Request representation</h4>
+                        <p>Clients can open a case request with the selected lawyer.</p>
+                      </div>
+                    </article>
+                    <article className="timeline-step upcoming">
+                      <span />
+                      <div>
+                        <h4>Private messaging opens</h4>
+                        <p>The secure thread becomes available after the lawyer accepts.</p>
+                      </div>
+                    </article>
+                  </div>
+                </aside>
+
+                <div className="client-case-main">
+                  <div className="progress-card workspace-overview-card" style={getLawyerTheme(selectedLawyer.name)}>
+                    <div className="progress-meta">
+                      <div>
+                        <p className="muted">Lawyer profile</p>
+                        <h3>{selectedLawyer.name}</h3>
+                      </div>
+                      <span className="case-meta-pill">{selectedLawyer.city}</span>
+                    </div>
+                    <p className="case-summary-text">{selectedLawyer.bio}</p>
+                    <div className="case-meta-row case-meta-row-rich">
+                      <span className="faq-tag case-faq-tag">{selectedLawyer.specialty}</span>
+                      <span className="case-meta-pill">{selectedLawyer.firm}</span>
+                      {renderLawyerReviewSummary(selectedLawyer)}
+                    </div>
+                    <div className="progress-bar">
+                      <div style={{ width: "100%" }} />
+                    </div>
+                  </div>
+
+                  <div className="conversation-shell">
+                    <div className="conversation-header">
+                      <div>
+                        <p className="panel-kicker">Private conversation</p>
+                        <h3>Messaging preview</h3>
+                      </div>
+                      <div className="conversation-header-meta">
+                        <span className="conversation-dot" />
+                        <span>Locked for guests</span>
+                      </div>
+                    </div>
+
+                    <div className="workspace-summary-stack">
+                      <div className="new-case-contact-card">
+                        <span>Email</span>
+                        <strong>{selectedLawyer.email}</strong>
+                      </div>
+                      <div className="new-case-contact-card">
+                        <span>Phone</span>
+                        <strong>{selectedLawyer.phone}</strong>
+                      </div>
+                    </div>
+
+                    <p className="hero-copy conversation-locked-copy">
+                      Guests can review lawyer details, but they cannot create a case or start a private thread from this screen.
+                    </p>
+
+                    <div className="decision-actions">
+                      <Link href={getReviewHref(selectedLawyer.name)} className="link-button">
+                        Read full reviews
+                      </Link>
+                      <Link href="/signup" className="link-button">
+                        Create client account
+                      </Link>
+                      <Link href="/" className="link-button ghost">
+                        Sign in
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="muted">Select a lawyer from the directory to open the preview workspace.</p>
+            )}
+          </div>
+        </section>
+      </>
+    );
+  }
+
   if (isClient) {
     return (
       <>
@@ -715,6 +926,7 @@ export default function MessagingClient() {
                           <span className="faq-tag case-faq-tag">{lawyer.specialty}</span>
                           <small>{lawyer.city}</small>
                         </div>
+                        {renderLawyerReviewSummary(lawyer)}
                       </button>
                     ))}
                   </div>
@@ -759,6 +971,14 @@ export default function MessagingClient() {
                       <div className="new-case-profile-section">
                         <p className="panel-kicker">Specialization</p>
                         <span className="faq-tag case-faq-tag">{selectedLawyer.specialty}</span>
+                      </div>
+
+                      <div className="new-case-profile-section">
+                        <p className="panel-kicker">Client rating</p>
+                        {renderLawyerReviewSummary(selectedLawyer)}
+                        <Link href={getReviewHref(selectedLawyer.name)} className="link-button">
+                          Read full reviews
+                        </Link>
                       </div>
 
                       <div className="new-case-profile-section">
