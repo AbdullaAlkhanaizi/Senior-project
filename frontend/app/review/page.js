@@ -7,8 +7,9 @@ export default async function ReviewPage({ searchParams }) {
 
   return (
     <PortalShell
-      title="Review Page"
-      description="This page allows you to see and manage reviews, insights, and feedback."
+      title="Ratings and reviews"
+      showEyebrow={false}
+      heroClassName="messaging-hero portal-aligned-hero"
     >
       <ReviewClient initialLawyer={initialLawyer} />
     </PortalShell>

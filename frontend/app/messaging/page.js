@@ -6,7 +6,7 @@ export default function MessagingPage() {
     <PortalShell
       title="Lawyer referral and messaging"
       showEyebrow={false}
-      heroClassName="messaging-hero"
+      heroClassName="messaging-hero portal-aligned-hero"
     >
       <MessagingClient />
     </PortalShell>
