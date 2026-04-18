@@ -6,16 +6,42 @@ import { INITIAL_REVIEWS, getReviewsForLawyer, getLawyerReviewSummary, normalize
 
 const LAWYER_OPTIONS = ["All lawyers", ...Array.from(new Set(INITIAL_REVIEWS.map((review) => review.lawyerName)))];
 
-function renderStars(ratingValue) {
+function ChevronIcon({ open }) {
+  return (
+    <svg
+      className={`review-chevron ${open ? "open" : ""}`}
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+function renderStars(ratingValue, { allowPartial = false } = {}) {
   const stars = [];
-  const rounded = Math.round(Number(ratingValue) || 0);
+  const numericRating = Number(ratingValue) || 0;
+  const roundedRating = allowPartial ? numericRating : Math.round(numericRating);
+
   for (let i = 1; i <= 5; i++) {
+    const fillPercent = Math.max(0, Math.min(1, roundedRating - (i - 1))) * 100;
     stars.push(
-      <span key={i} className={i <= rounded ? "star-filled" : "star-empty"}>
-        ★
+      <span key={i} className="review-star" aria-hidden="true">
+        <span className="review-star-base">{"\u2605"}</span>
+        <span className="review-star-fill" style={{ width: `${fillPercent}%` }}>
+          {"\u2605"}
+        </span>
       </span>
     );
   }
+
   return stars;
 }
 
@@ -28,13 +54,17 @@ export default function ReviewClient({ initialLawyer = "" }) {
   const [submittedReviews, setSubmittedReviews] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("newest");
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(true);
+
   const matchedInitialLawyer = LAWYER_OPTIONS.find(
     (option) => normalizeLawyerReviewKey(option) === normalizeLawyerReviewKey(initialLawyer)
   );
+
   const [selectedLawyer, setSelectedLawyer] = useState(matchedInitialLawyer || "All lawyers");
+  const selectedLawyerOptions = LAWYER_OPTIONS.filter((option) => option !== "All lawyers");
 
   const allReviews = useMemo(() => [...submittedReviews, ...INITIAL_REVIEWS], [submittedReviews]);
+
   const visibleReviews = useMemo(
     () => (selectedLawyer === "All lawyers" ? allReviews : getReviewsForLawyer(allReviews, selectedLawyer)),
     [allReviews, selectedLawyer]
@@ -42,13 +72,16 @@ export default function ReviewClient({ initialLawyer = "" }) {
 
   const filteredReviews = useMemo(() => {
     return visibleReviews
-      .filter((item) =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.review.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.lawyerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.date.includes(searchTerm)
-      )
+      .filter((item) => {
+        const normalizedSearch = searchTerm.toLowerCase();
+        return (
+          item.name.toLowerCase().includes(normalizedSearch) ||
+          item.title.toLowerCase().includes(normalizedSearch) ||
+          item.review.toLowerCase().includes(normalizedSearch) ||
+          item.lawyerName.toLowerCase().includes(normalizedSearch) ||
+          item.date.includes(searchTerm)
+        );
+      })
       .sort((a, b) => {
         if (sortOption === "newest") return new Date(b.date) - new Date(a.date);
         if (sortOption === "oldest") return new Date(a.date) - new Date(b.date);
@@ -73,8 +106,8 @@ export default function ReviewClient({ initialLawyer = "" }) {
   const maxCount = Math.max(...ratingCounts.map((item) => item.count), 0);
 
   function handleToggleForm() {
-    if (!showForm && selectedLawyer === "All lawyers" && LAWYER_OPTIONS[1]) {
-      setSelectedLawyer(LAWYER_OPTIONS[1]);
+    if (!showForm && selectedLawyer === "All lawyers" && selectedLawyerOptions[0]) {
+      setSelectedLawyer(selectedLawyerOptions[0]);
     }
     setShowForm((current) => !current);
   }
@@ -106,142 +139,202 @@ export default function ReviewClient({ initialLawyer = "" }) {
   }
 
   return (
-    <div className="review-container">
-      <div className="ratings-section">
-        <div className="ratings-container">
-          <h3 className="ratings-title">
-            {selectedLawyer === "All lawyers" ? "Ratings Overview" : `${selectedLawyer} ratings`}
-          </h3>
-          <div className="review-summary-strip">
-            <div>
-              <strong>{selectedSummary.average.toFixed(1)}</strong>
-              <span>Average rating</span>
-            </div>
-            <div className="review-summary-stars">{renderStars(selectedSummary.average)}</div>
-            <div>
-              <strong>{selectedSummary.count}</strong>
-              <span>{selectedSummary.count === 1 ? "Review" : "Reviews"}</span>
-            </div>
-          </div>
-
-          <div className="ratings-bar-chart">
-            {ratingCounts.map((item) => (
-              <div key={item.rating} className="rating-row">
-                <div className="rating-text">
-                  <strong>{item.rating}.0</strong> ({item.count} {item.count === 1 ? "review" : "reviews"})
-                </div>
-                <div className="rating-bar-container">
-                  <div
-                    className="rating-bar-fill"
-                    style={{
-                      width: maxCount ? `${(item.count / maxCount) * 100}%` : "0%"
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="ratings-info-card">
-          <h3>{selectedLawyer === "All lawyers" ? "Review directory" : `About ${selectedLawyer}`}</h3>
-          <p>
-            Reviews are now organized by lawyer, so clients can compare experience, responsiveness, and clarity before opening a case.
-          </p>
-          <p>
-            Use the lawyer filter to inspect one profile in depth, then sort by newest or rating to scan the most relevant feedback quickly.
-          </p>
-        </div>
-      </div>
-
-      <div className="search-sort">
-        <select value={selectedLawyer} onChange={(event) => setSelectedLawyer(event.target.value)}>
-          {LAWYER_OPTIONS.map((option) => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="Search reviews..."
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
-        />
-        <select value={sortOption} onChange={(event) => setSortOption(event.target.value)}>
-          <option value="newest">Newest</option>
-          <option value="oldest">Oldest</option>
-          <option value="highest">Highest Rating</option>
-          <option value="lowest">Lowest Rating</option>
-        </select>
-
-        <button className="toggle-review-btn" onClick={handleToggleForm}>
-          {showForm ? "Hide Review Form" : "Leave Your Review"}
+    <section className="review-showcase">
+      <div className="review-showcase-header">
+        <button type="button" className="toggle-review-btn" onClick={handleToggleForm}>
+          {showForm ? "Hide Review Form" : "Show Review Form"}
         </button>
       </div>
 
-      {showForm ? (
-        <div className="review-form">
-          <select value={selectedLawyer} onChange={(event) => setSelectedLawyer(event.target.value)}>
-            {LAWYER_OPTIONS.filter((option) => option !== "All lawyers").map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-          <input
-            type="text"
-            placeholder="Review Title"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-          />
-          <input
-            type="text"
-            placeholder="Your Name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-          <input
-            type="email"
-            placeholder="Your Email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <textarea
-            placeholder="Write your review..."
-            value={review}
-            onChange={(event) => setReview(event.target.value)}
-          />
-
-          <div className="rating-select">
-            <label>Rating:</label>
-            <select value={rating} onChange={(event) => setRating(Number(event.target.value))}>
-              <option value={5}>★★★★★</option>
-              <option value={4}>★★★★</option>
-              <option value={3}>★★★</option>
-              <option value={2}>★★</option>
-              <option value={1}>★</option>
-            </select>
-          </div>
-
-          <button className="submit-review-btn" onClick={handleSubmit}>
-            Submit Review
-          </button>
-        </div>
-      ) : null}
-
-      <div className="reviews-grid">
-        {filteredReviews.map((item) => (
-          <div key={item.id} className="review-card">
-            <div className="review-header">
-              <div>
-                <p className="review-name">{item.name}</p>
-                <small className="review-lawyer">{item.lawyerName}</small>
+      <div className="review-layout">
+        <div className="review-left-column">
+          <div className="ratings-container">
+            <div className="ratings-card-content">
+              <div className="ratings-summary">
+                <span className="summary-label">OVERALL RATING</span>
+                <div className="summary-score-row">
+                  <strong>{selectedSummary.average.toFixed(1)}</strong>
+                  <div className="review-summary-stars" aria-label={`${selectedSummary.average.toFixed(1)} out of 5 stars`}>
+                    {renderStars(selectedSummary.average, { allowPartial: true })}
+                  </div>
+                </div>
+                <p>
+                  Based on {selectedSummary.count} {selectedSummary.count === 1 ? "Rating" : "Ratings"}
+                </p>
               </div>
-              <p className="review-stars">{renderStars(item.rating)}</p>
+
+              <div className="ratings-bar-chart">
+                {ratingCounts.map((item) => (
+                  <div key={item.rating} className="rating-row">
+                    <span className="rating-row-label">{item.rating.toFixed(1)}</span>
+                    <div className="rating-bar-container">
+                      <div
+                        className="rating-bar-fill"
+                        style={{
+                          width: maxCount ? `${(item.count / maxCount) * 100}%` : "0%"
+                        }}
+                      />
+                    </div>
+                    <span className="rating-row-count">{item.count}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <h3 className="review-title">{item.title}</h3>
-            <p className="review-text">{item.review}</p>
-            <p className="review-date">{item.date}</p>
           </div>
-        ))}
+
+          <div className="review-form-card">
+            <button type="button" className="review-form-header" onClick={handleToggleForm} aria-expanded={showForm}>
+              <span>Submit a Review</span>
+              <ChevronIcon open={showForm} />
+            </button>
+
+            {showForm ? (
+              <div className="review-form">
+                <div className="review-field">
+                  <label htmlFor="review-lawyer">Lawyer Dropdown</label>
+                  <select
+                    id="review-lawyer"
+                    value={selectedLawyer === "All lawyers" ? selectedLawyerOptions[0] || "" : selectedLawyer}
+                    onChange={(event) => setSelectedLawyer(event.target.value)}
+                  >
+                    {selectedLawyerOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="review-field">
+                  <label htmlFor="review-title">Review Title</label>
+                  <input
+                    id="review-title"
+                    type="text"
+                    placeholder="e.g., Clear guidance on a traffic fine"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                  />
+                </div>
+
+                <div className="review-form-grid">
+                  <div className="review-field">
+                    <label htmlFor="review-name">Your Full Name</label>
+                    <input
+                      id="review-name"
+                      type="text"
+                      placeholder="e.g., Alice"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                  </div>
+
+                  <div className="review-field">
+                    <label htmlFor="review-email">Your Email Address</label>
+                    <input
+                      id="review-email"
+                      type="email"
+                      placeholder="e.g., alice@example.com"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="review-field">
+                  <label htmlFor="review-comment">Review Text / Comment</label>
+                  <textarea
+                    id="review-comment"
+                    placeholder="Share your experience"
+                    value={review}
+                    onChange={(event) => setReview(event.target.value)}
+                  />
+                </div>
+
+                <div className="rating-select">
+                  <span>Rating:</span>
+                  <div className="rating-picker" role="radiogroup" aria-label="Select a rating">
+                    {[1, 2, 3, 4, 5].map((score) => (
+                      <button
+                        key={score}
+                        type="button"
+                        className={`rating-star-button ${score <= rating ? "active" : ""}`}
+                        onClick={() => setRating(score)}
+                        aria-label={`${score} star${score === 1 ? "" : "s"}`}
+                        aria-pressed={score === rating}
+                      >
+                        {"\u2605"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button className="submit-review-btn" onClick={handleSubmit}>
+                  Submit Review
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="review-right-column">
+          <div className="reviews-heading-block">
+            <h2>Reviews ({filteredReviews.length})</h2>
+          </div>
+
+          <div className="search-sort">
+            <div className="review-filter-field">
+              <label htmlFor="existing-lawyer-filter">Attorney</label>
+              <select id="existing-lawyer-filter" value={selectedLawyer} onChange={(event) => setSelectedLawyer(event.target.value)}>
+                {LAWYER_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="review-filter-field review-search-field">
+              <label htmlFor="existing-review-search" className="review-sr-only">
+                Search reviews
+              </label>
+              <input
+                id="existing-review-search"
+                type="text"
+                placeholder="Search reviews..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+            </div>
+
+            <div className="review-filter-field">
+              <label htmlFor="existing-review-sort">Sort</label>
+              <select id="existing-review-sort" value={sortOption} onChange={(event) => setSortOption(event.target.value)}>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="highest">Highest Rating</option>
+                <option value="lowest">Lowest Rating</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="reviews-grid">
+            {filteredReviews.map((item) => (
+              <article key={item.id} className="review-card">
+                <div className="review-card-top">
+                  <h3 className="review-title">{item.title}</h3>
+                </div>
+                <div className="review-stars review-card-stars" aria-label={`${item.rating} out of 5 stars`}>
+                  {renderStars(item.rating)}
+                </div>
+                <p className="review-meta">
+                  By: {item.name} / {item.date}
+                </p>
+                <p className="review-text">{item.review}</p>
+              </article>
+            ))}
+          </div>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

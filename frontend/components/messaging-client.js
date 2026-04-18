@@ -217,6 +217,30 @@ export default function MessagingClient() {
     );
   }
 
+  function EmailIcon() {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M5.5 8 12 13l6.5-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  function PhoneIcon() {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M8.2 4.5c.5-.5 1.3-.6 1.9-.2l2 1.2c.7.4.9 1.3.6 2l-.8 1.8c-.2.5-.1 1 .2 1.4l1.9 1.9c.4.4 1 .5 1.4.2l1.8-.8c.7-.3 1.5-.1 2 .6l1.2 2c.4.6.3 1.4-.2 1.9l-1.1 1.1c-1 1-2.5 1.4-3.9.9-2.4-.8-4.6-2.3-6.5-4.2s-3.4-4.1-4.2-6.5c-.5-1.4-.1-2.9.9-3.9z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
   function renderCaseListItem(item, secondaryName, accentKey) {
     return (
       <button
@@ -910,12 +934,19 @@ export default function MessagingClient() {
                   </div>
                   <div className="new-case-lawyer-list">
                     {lawyers.map((lawyer) => (
-                      <button
+                      <div
                         key={lawyer.id}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         className={`new-case-lawyer-card ${Number(selectedLawyerId) === lawyer.id ? "selected" : ""}`}
                         style={getLawyerTheme(lawyer.name)}
                         onClick={() => setSelectedLawyerId(lawyer.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setSelectedLawyerId(lawyer.id);
+                          }
+                        }}
                       >
                         <div className="new-case-lawyer-avatar">{getInitials(lawyer.name)}</div>
                         <div className="new-case-lawyer-copy">
@@ -923,11 +954,11 @@ export default function MessagingClient() {
                           <span>{lawyer.firm}</span>
                         </div>
                         <div className="new-case-lawyer-meta">
-                          <span className="faq-tag case-faq-tag">{lawyer.specialty}</span>
+                          <p className="panel-kicker">Specialization</p>
+                          <span className="faq-tag case-faq-tag new-case-specialty-tag">{lawyer.specialty}</span>
                           <small>{lawyer.city}</small>
                         </div>
-                        {renderLawyerReviewSummary(lawyer)}
-                      </button>
+                      </div>
                     ))}
                   </div>
 
@@ -970,11 +1001,12 @@ export default function MessagingClient() {
 
                       <div className="new-case-profile-section">
                         <p className="panel-kicker">Specialization</p>
-                        <span className="faq-tag case-faq-tag">{selectedLawyer.specialty}</span>
+                        <span className="faq-tag case-faq-tag new-case-specialty-tag">{selectedLawyer.specialty}</span>
+                        <p className="new-case-profile-location">{selectedLawyer.city}</p>
                       </div>
 
                       <div className="new-case-profile-section">
-                        <p className="panel-kicker">Client rating</p>
+                        <p className="panel-kicker">Client review</p>
                         {renderLawyerReviewSummary(selectedLawyer)}
                         <Link href={getReviewHref(selectedLawyer.name)} className="link-button">
                           Read full reviews
@@ -984,12 +1016,22 @@ export default function MessagingClient() {
                       <div className="new-case-profile-section">
                         <p className="panel-kicker">Contact</p>
                         <div className="new-case-contact-card">
-                          <span>Email</span>
-                          <strong>{selectedLawyer.email}</strong>
+                          <div className="new-case-contact-icon">
+                            <EmailIcon />
+                          </div>
+                          <div className="new-case-contact-copy">
+                            <span>Email</span>
+                            <strong>{selectedLawyer.email}</strong>
+                          </div>
                         </div>
                         <div className="new-case-contact-card">
-                          <span>Phone</span>
-                          <strong>{selectedLawyer.phone}</strong>
+                          <div className="new-case-contact-icon">
+                            <PhoneIcon />
+                          </div>
+                          <div className="new-case-contact-copy">
+                            <span>Phone</span>
+                            <strong>{selectedLawyer.phone}</strong>
+                          </div>
                         </div>
                       </div>
                     </div>
