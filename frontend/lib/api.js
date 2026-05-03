@@ -68,6 +68,15 @@ export async function getDashboard() {
   return parseJSON(response);
 }
 
+export async function askLegalAssistant(payload) {
+  const response = await fetch(`${API_BASE}/api/ai/chat`, {
+    method: "POST",
+    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload)
+  });
+  return parseJSON(response);
+}
+
 export async function createCase(payload) {
   const response = await fetch(`${API_BASE}/api/cases`, {
     method: "POST",

@@ -137,3 +137,21 @@ type AuthResponse struct {
 	Token    string `json:"token,omitempty"`
 	LawyerID int64  `json:"lawyerId,omitempty"`
 }
+
+type AIChatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type AIChatRequest struct {
+	Mode     string          `json:"mode"`
+	Category string          `json:"category"`
+	Messages []AIChatMessage `json:"messages"`
+}
+
+type AIChatResponse struct {
+	Message          AIChatMessage `json:"message"`
+	Model            string        `json:"model"`
+	Disclaimer       string        `json:"disclaimer"`
+	SuggestedActions []string      `json:"suggestedActions"`
+}

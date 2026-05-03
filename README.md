@@ -41,6 +41,8 @@ This starts:
 - frontend on `http://localhost:3000`
 - backend on `http://localhost:8080`
 
+## OR start them individually
+
 ## Run the backend
 
 ```powershell
@@ -66,6 +68,10 @@ $env:ADMIN_NAME="Your Admin Name"
 $env:ADMIN_EMAIL="you@example.com"
 $env:ADMIN_PASSWORD="UseAStrongPassword"
 $env:AUTH_SECRET="replace-this-in-real-use"
+$env:DEEPSEEK_API_KEY="your-deepseek-key"
+$env:DEEPSEEK_MODEL="deepseek-v4-flash"
+$env:DEEPSEEK_BASE_URL="https://api.deepseek.com"
+$env:AI_JURISDICTION="Bahrain"
 ```
 
 ## Run the frontend
@@ -99,11 +105,36 @@ If you only want to change routing, edit the files in `frontend/app/`.
 
 ## Implement your chatbot later
 
-The frontend already includes a dedicated AI page. You can later replace the placeholder messages and send button logic with your AI integration. The backend also has a clear escalation path:
+The AI page is now wired to a backend chat endpoint that can call DeepSeek when `DEEPSEEK_API_KEY` is set. The backend also has a clear escalation path:
 
 - Basic questions stay in the chatbot.
 - Complex questions can create a case and assign a lawyer.
 - The client and lawyer can continue through the messaging workspace.
+
+### DeepSeek-backed AI assistant
+
+The backend expects these environment variables:
+
+```powershell
+$env:DEEPSEEK_API_KEY="your-deepseek-key"
+$env:DEEPSEEK_MODEL="deepseek-v4-flash"
+$env:DEEPSEEK_BASE_URL="https://api.deepseek.com"
+$env:AI_JURISDICTION="Bahrain"
+```
+
+What is implemented:
+
+- `Ask a Question` sends legal Q&A prompts to DeepSeek.
+- `Create Document` drafts first-pass legal text with placeholders.
+- `Analyze Document` reviews pasted clauses or documents for risks and gaps.
+- `Find Lawyer` reuses the existing lawyer directory and routes users to the protected workspace.
+
+The AI endpoint returns general legal information only. For real deployment, you should still add:
+
+- jurisdiction-specific legal source material or retrieval
+- logging and rate limits
+- stronger redaction and audit rules
+- lawyer review before any action based on generated content
 
 ## API summary
 
@@ -113,6 +144,7 @@ The frontend already includes a dedicated AI page. You can later replace the pla
 - `POST /api/auth/guest`
 - `POST /api/admin/lawyers`
 - `GET /api/dashboard`
+- `POST /api/ai/chat`
 - `GET /api/cases`
 - `POST /api/cases`
 - `GET /api/cases/:id`
