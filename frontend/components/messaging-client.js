@@ -81,6 +81,7 @@ export default function MessagingClient() {
   const [newStep, setNewStep] = useState({ label: "", state: "upcoming" });
   const [clientView, setClientView] = useState("list");
   const [lawyerView, setLawyerView] = useState("list");
+  const [showCreateCaseForm, setShowCreateCaseForm] = useState(false);
   const [draggedStepId, setDraggedStepId] = useState(null);
   const [dragOverStepId, setDragOverStepId] = useState(null);
 

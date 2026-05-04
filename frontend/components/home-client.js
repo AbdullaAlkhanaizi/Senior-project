@@ -1,88 +1,271 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
-import { createLawyerAccount, getDashboard } from "../lib/api";
+import { getDashboard } from "../lib/api";
+import { INITIAL_REVIEWS } from "../lib/reviews";
 import { loadSession } from "../lib/session";
 
-const ROLE_COPY = {
-  admin: "Create lawyer accounts, review platform activity, and manage access controls across the portal.",
-  lawyer: "Review your assigned matters and continue protected communication from the messaging workspace.",
-  client: "Track your case, contact your lawyer, and prepare referrals through the guided assistant.",
-  guest: "Preview the platform features as a guest user before creating a referral or protected case."
-};
-
-const INITIAL_LAWYER_FORM = {
-  name: "",
-  email: "",
-  password: "",
-  firm: "",
-  specialty: "",
-  city: "",
-  phone: "",
-  bio: ""
-};
-
-const FEATURE_CARDS = [
+const QUICK_ACTIONS = [
   {
     href: "/ai",
-    title: "Ask the AI legal assistant",
-    description: "Start triage, ask questions, and prepare for escalation.",
-    icon: "bot"
+    title: "Ask AI",
+    description: "Get instant answers to your legal questions with our AI assistant.",
+    cta: "Start Chat",
+    icon: "ai",
+    tone: "warm"
   },
   {
     href: "/faq",
-    title: "Browse legal FAQs",
-    description: "Explore the frequently asked questions already surfaced by the system.",
-    icon: "faq"
+    title: "Browse FAQs",
+    description: "Find answers to common legal questions and understand your rights.",
+    cta: "Browse FAQs",
+    icon: "chat",
+    tone: "sun"
+  },
+  {
+    href: "/labor",
+    title: "Labor Calculator",
+    description: "Calculate salaries, benefits, end-of-service, and more with ease.",
+    cta: "Calculate",
+    icon: "calculator",
+    tone: "violet"
   },
   {
     href: "/messaging",
-    title: "Open Messaging",
-    description: "View case progress, files shared, and direct lawyer communication.",
-    icon: "message"
+    title: "Manage Cases",
+    description: "Track your cases and communicate with your lawyer securely.",
+    cta: "View Cases",
+    icon: "message",
+    tone: "sand"
+  }
+];
+
+const HERO_BENEFITS = [
+  {
+    title: "Secure & Private",
+    description: "Your data is encrypted and protected.",
+    icon: "lock"
   },
   {
-    href: "/signup",
-    title: "Create a client account",
-    description: "Only clients self-register. Lawyer accounts are created by admins.",
+    title: "Trusted Platform",
+    description: "Verified lawyers and reliable information.",
+    icon: "shield"
+  },
+  {
+    title: "Save Time",
+    description: "Get answers and resolve issues faster.",
+    icon: "clock"
+  }
+];
+
+const PLATFORM_FEATURES = [
+  {
+    title: "AI-Powered Assistance",
+    icon: "sparkles",
+    items: ["Instant legal answers", "Local laws and regulations", "Smart recommendations"]
+  },
+  {
+    title: "Legal Documents",
+    icon: "document",
+    items: ["Ready-to-use templates", "AI-assisted drafting", "Save and manage files"]
+  },
+  {
+    title: "Connect with Lawyers",
+    icon: "shield-star",
+    items: ["Verified legal professionals", "Direct messaging", "Case tracking and updates"]
+  }
+];
+
+const HOW_IT_WORKS = [
+  {
+    title: "Ask Your Question",
+    description: "Describe your legal issue in your own words.",
+    icon: "question"
+  },
+  {
+    title: "Get Instant Guidance",
+    description: "Our AI provides clear, accurate legal information.",
+    icon: "sparkles"
+  },
+  {
+    title: "Connect If Needed",
+    description: "Talk to a lawyer and manage your case with ease.",
     icon: "user"
   }
 ];
 
-const ROLE_BOUNDARIES = [
+const FAQ_SUMMARIES = {
+  "Is running a red light illegal?": "Review the traffic-law basics and when a fine may need follow-up.",
+  "Can my employer cut my salary without notice?": "Check the usual notice and contract issues before responding.",
+  "How do I respond to a landlord dispute notice?": "Start by preserving the notice, dates, and supporting evidence.",
+  "What should I do after getting a store theft accusation?": "Stay calm, document what happened, and ask for legal guidance."
+};
+
+const FOOTER_COLUMNS = [
   {
-    title: "Admins",
-    description: "Can create lawyer accounts and review platform data, but never access protected client-lawyer threads."
+    title: "Platform",
+    links: [
+      { label: "AI Assistant", href: "/ai" },
+      { label: "FAQs", href: "/faq" },
+      { label: "Messaging", href: "/messaging" },
+      { label: "Labor Calculator", href: "/labor" }
+    ]
   },
   {
-    title: "Lawyers",
-    description: "Can access only the cases assigned to their account and continue protected communication."
+    title: "Company",
+    links: [
+      { label: "About Us", href: "/home" },
+      { label: "How It Works", href: "#how-it-works" },
+      { label: "For Lawyers", href: "/messaging" },
+      { label: "Contact Us", href: "/home" }
+    ]
   },
   {
-    title: "Clients",
-    description: "Can self-register and access only their own cases, updates, and conversations."
+    title: "Legal",
+    links: [
+      { label: "Terms of Service", href: "/home" },
+      { label: "Privacy Policy", href: "/home" },
+      { label: "Cookie Policy", href: "/home" }
+    ]
+  },
+  {
+    title: "Support",
+    links: [
+      { label: "Help Center", href: "/faq" },
+      { label: "Guides", href: "/faq" },
+      { label: "Contact Support", href: "/messaging" }
+    ]
   }
 ];
 
-function HomeIcon({ type }) {
-  if (type === "faq") {
+function LegalHomeIcon({ type }) {
+  if (type === "ai") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M6 4.5h9l3 3V19a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 19V6A1.5 1.5 0 0 1 6.5 4.5Z" />
-        <path d="M14.5 4.5V8h3.5" />
-        <path d="M8 11h8" />
-        <path d="M8 14h8" />
+        <path d="M12 4.5c1.2 2.9 2.1 3.8 5 5-2.9 1.2-3.8 2.1-5 5-1.2-2.9-2.1-3.8-5-5 2.9-1.2 3.8-2.1 5-5Z" />
+        <path d="M5.5 14.5c.6 1.5 1.1 2 2.6 2.6-1.5.6-2 1.1-2.6 2.6-.6-1.5-1.1-2-2.6-2.6 1.5-.6 2-1.1 2.6-2.6Z" />
+        <path d="M18 3.5c.5 1.1.9 1.5 2 2-.1.6-.5 1-1 1.2-.5.2-.9.6-1.2 1.3-.5-1.1-.9-1.5-2-2 1.1-.5 1.5-.9 2.2-2.5Z" />
       </svg>
     );
   }
 
-  if (type === "message") {
+  if (type === "calculator") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M6.5 6.5h11A2.5 2.5 0 0 1 20 9v5a2.5 2.5 0 0 1-2.5 2.5h-6.2l-3.6 2.8c-.5.4-1.2 0-1.2-.7v-2.1A2.5 2.5 0 0 1 4 14V9a2.5 2.5 0 0 1 2.5-2.5Z" />
-        <path d="M8 11h8" />
+        <rect x="6" y="3.5" width="12" height="17" rx="2" />
+        <path d="M8.8 7h6.4" />
+        <path d="M9 11h.01M12 11h.01M15 11h.01M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01M15 17h.01" />
+      </svg>
+    );
+  }
+
+  if (type === "chat" || type === "message") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6.5 5.5h11A2.5 2.5 0 0 1 20 8v5.3a2.5 2.5 0 0 1-2.5 2.5h-6.1l-3.7 2.8c-.5.4-1.2 0-1.2-.7v-2.1A2.5 2.5 0 0 1 4 13.3V8a2.5 2.5 0 0 1 2.5-2.5Z" />
+      </svg>
+    );
+  }
+
+  if (type === "lock") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="5" y="10" width="14" height="10" rx="2.2" />
+        <path d="M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10" />
+      </svg>
+    );
+  }
+
+  if (type === "shield" || type === "shield-star") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3.5 18.5 6v5.1c0 4.2-2.6 7.3-6.5 9.4-3.9-2.1-6.5-5.2-6.5-9.4V6L12 3.5Z" />
+        {type === "shield-star" ? <path d="m12 8.2.9 1.9 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3.9-1.9Z" /> : <path d="m9.5 12 1.7 1.7 3.4-3.8" />}
+      </svg>
+    );
+  }
+
+  if (type === "clock") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="13" r="7" />
+        <path d="M12 9.5V13l2.4 1.7" />
+        <path d="M9 3.5h6" />
+      </svg>
+    );
+  }
+
+  if (type === "document") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6.5 3.5h8l3 3v14h-11Z" />
+        <path d="M14.5 3.5v3h3" />
+        <path d="M9 11h6M9 14h6M9 17h4" />
+      </svg>
+    );
+  }
+
+  if (type === "sparkles") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 4.5c.8 2.1 1.5 2.8 3.6 3.6C8.5 8.9 7.8 9.6 7 11.7 6.2 9.6 5.5 8.9 3.4 8.1 5.5 7.3 6.2 6.6 7 4.5Z" />
+        <path d="M15 8c1.1 2.9 2.1 3.9 5 5-2.9 1.1-3.9 2.1-5 5-1.1-2.9-2.1-3.9-5-5 2.9-1.1 3.9-2.1 5-5Z" />
+      </svg>
+    );
+  }
+
+  if (type === "traffic") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="4" y="10" width="16" height="6" rx="2" />
+        <path d="M7.5 10 9.8 7h4.4l2.3 3" />
+        <circle cx="8" cy="16.5" r="1.4" />
+        <circle cx="16" cy="16.5" r="1.4" />
+      </svg>
+    );
+  }
+
+  if (type === "employment") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 8.5h14v10H5Z" />
+        <path d="M9 8.5V6.8A1.8 1.8 0 0 1 10.8 5h2.4A1.8 1.8 0 0 1 15 6.8v1.7" />
+        <path d="M5 12h14" />
+      </svg>
+    );
+  }
+
+  if (type === "housing") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4.5 11 12 4.8 19.5 11" />
+        <path d="M6.5 9.8V20h11V9.8" />
+        <path d="M10 20v-5h4v5" />
+      </svg>
+    );
+  }
+
+  if (type === "criminal") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 4v15" />
+        <path d="M6.5 7h11" />
+        <path d="m7 7-3 5h6L7 7Z" />
+        <path d="m17 7-3 5h6l-3-5Z" />
+        <path d="M9 19h6" />
+      </svg>
+    );
+  }
+
+  if (type === "question") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9.5 9a2.6 2.6 0 1 1 4.3 2c-.9.7-1.8 1.2-1.8 2.7" />
+        <path d="M12 17h.01" />
+        <circle cx="12" cy="12" r="8" />
       </svg>
     );
   }
@@ -90,31 +273,16 @@ function HomeIcon({ type }) {
   if (type === "user") {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 12a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" />
-        <path d="M5 19a6.6 6.6 0 0 1 14 0" />
-        <path d="M18.5 8.5v4" />
-        <path d="M16.5 10.5h4" />
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5.5 19a6.5 6.5 0 0 1 13 0" />
       </svg>
     );
   }
 
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="5" y="7" width="14" height="10" rx="3" />
-      <path d="M9 12h.01M15 12h.01" />
-      <path d="M12 4.5v2" />
-      <path d="M8 4.5 9.5 6" />
-      <path d="M16 4.5 14.5 6" />
-    </svg>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3.5 18 6v5.2c0 4.1-2.5 7.1-6 9.3-3.5-2.2-6-5.2-6-9.3V6l6-2.5Z" />
-      <path d="M12 8.5v5" />
-      <path d="M9.5 11h5" />
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
     </svg>
   );
 }
@@ -122,61 +290,58 @@ function ShieldIcon() {
 function ArrowIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="m9 6 6 6-6 6" />
+      <path d="M5 12h12" />
+      <path d="m12 7 5 5-5 5" />
     </svg>
   );
 }
 
-function MaleLawyerIcon() {
+function StarRating({ rating }) {
+  const rounded = Math.round(Number(rating) || 0);
+
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 12a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" />
-      <path d="M5.5 19a6.5 6.5 0 0 1 13 0" />
-      <path d="M15 4h4v4" />
-      <path d="m19 5-3.5 3.5" />
-    </svg>
+    <span className="login-home-stars" aria-label={`${rounded} out of 5 stars`}>
+      {[1, 2, 3, 4, 5].map((value) => (
+        <span key={value} className={value <= rounded ? "filled" : ""}>
+          {"\u2605"}
+        </span>
+      ))}
+    </span>
   );
 }
 
-function FemaleLawyerIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
-      <path d="M8.5 19c.4-3 1.9-5 3.5-6.2 1.6 1.2 3.1 3.2 3.5 6.2" />
-      <path d="M12 15.5v4" />
-      <path d="M10.2 19.5h3.6" />
-    </svg>
-  );
+function getFAQIcon(category = "") {
+  const normalized = category.toLowerCase();
+  if (normalized.includes("traffic")) return "traffic";
+  if (normalized.includes("employment")) return "employment";
+  if (normalized.includes("housing")) return "housing";
+  if (normalized.includes("criminal")) return "criminal";
+  return "question";
 }
 
-function getLawyerProfile(name) {
-  const firstName = (name || "").trim().split(" ")[0]?.toLowerCase();
-  const femaleNames = new Set(["noor", "sara", "fatima", "maryam", "layla", "amal", "noura", "huda"]);
-
-  if (femaleNames.has(firstName)) {
-    return {
-      tone: "female",
-      icon: <FemaleLawyerIcon />
-    };
-  }
-
-  return {
-    tone: "male",
-    icon: <MaleLawyerIcon />
-  };
+function getInitials(name = "") {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("");
 }
 
 export default function HomeClient() {
-  const [session, setSession] = useState(null);
+  const router = useRouter();
   const [dashboard, setDashboard] = useState(null);
-  const [lawyerForm, setLawyerForm] = useState(INITIAL_LAWYER_FORM);
-  const [openBoundary, setOpenBoundary] = useState(null);
-  const [status, setStatus] = useState("");
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const currentSession = loadSession();
-    setSession(currentSession);
+    if (!currentSession) {
+      router.replace("/");
+      return;
+    }
+
+    setReady(true);
 
     async function load() {
       try {
@@ -188,243 +353,211 @@ export default function HomeClient() {
     }
 
     load();
-  }, []);
+  }, [router]);
 
-  const role = session?.role || "guest";
-  const activeCase = dashboard?.activeCase;
-  const lawyers = dashboard?.lawyers || [];
+  const popularQuestions = useMemo(() => {
+    return [...(dashboard?.faqSuggestions || [])]
+      .sort((left, right) => left.priority - right.priority)
+      .slice(0, 4);
+  }, [dashboard]);
 
-  const visibleFeatures = FEATURE_CARDS.filter((card) => {
-    if (card.href === "/messaging" && role === "admin") {
-      return false;
-    }
+  const featuredReviews = useMemo(() => INITIAL_REVIEWS.slice(0, 3), []);
 
-    if (card.href === "/signup" && role !== "guest") {
-      return false;
-    }
-
-    return true;
-  });
-
-  async function handleCreateLawyer(event) {
-    event.preventDefault();
-    setError("");
-    setStatus("Creating lawyer account...");
-
-    try {
-      const lawyer = await createLawyerAccount(lawyerForm);
-      setDashboard((current) => ({
-        ...(current || {}),
-        lawyers: [...(current?.lawyers || []), lawyer]
-      }));
-      setLawyerForm(INITIAL_LAWYER_FORM);
-      setStatus(`${lawyer.name} can now sign in with the lawyer role.`);
-    } catch (requestError) {
-      setError(requestError.message);
-      setStatus("");
-    }
-  }
-
-  function updateLawyerForm(field, value) {
-    setLawyerForm((current) => ({
-      ...current,
-      [field]: value
-    }));
+  if (!ready) {
+    return (
+      <main className="login-home-page">
+        <p className="login-home-loading">Preparing your home page...</p>
+      </main>
+    );
   }
 
   return (
-    <div className="home-reference-page">
+    <main className="login-home-page">
       {error ? <p className="feedback error">{error}</p> : null}
-      {status ? <p className="feedback">{status}</p> : null}
 
-      <section className="home-reference-grid">
-        <div className="home-reference-main">
-          <section className="home-hero">
-            <div className="home-hero-copy">
-              <h1>Start navigating the legal platform</h1>
-              <p>
-                {ROLE_COPY[role] || ROLE_COPY.guest}
-              </p>
-              <div className="home-hero-actions">
-                {role === "guest" ? (
-                  <Link href="/signup" className="home-primary-button">Create Client Account</Link>
-                ) : role === "admin" ? (
-                  <a href="#lawyer-account-form" className="home-primary-button">Create Lawyer Account</a>
-                ) : (
-                  <Link href="/messaging" className="home-primary-button">Open Protected Workspace</Link>
-                )}
-              </div>
-            </div>
-          </section>
-
-          <section className="home-feature-grid">
-            {visibleFeatures.map((card) => (
-              <Link key={card.title} href={card.href} className="home-feature-card">
-                <span className="home-feature-icon">
-                  <HomeIcon type={card.icon} />
-                </span>
-                <div>
-                  <h2>{card.title}</h2>
-                  <p>{card.description}</p>
-                </div>
-              </Link>
-            ))}
-
-            {role === "admin" ? (
-              <article className="home-feature-card home-feature-card-static">
-                <span className="home-feature-icon">
-                  <ShieldIcon />
-                </span>
-                <div>
-                  <h2>Protected messaging stays private</h2>
-                  <p>Admin accounts can manage access and data, but cannot open client-lawyer message threads.</p>
-                </div>
-              </article>
-            ) : null}
-          </section>
-
-          <section className="home-lawyers-panel">
-            <div className="home-section-heading">
-              <h2>Lawyer Accounts</h2>
-            </div>
-
-            <div className="home-lawyer-grid">
-              {lawyers.map((lawyer) => {
-                const profile = getLawyerProfile(lawyer.name);
-
-                return (
-                <article key={lawyer.id} className="home-lawyer-card">
-                  <div className="home-lawyer-top">
-                    <span className={`home-lawyer-avatar ${profile.tone}`}>
-                      {profile.icon}
-                    </span>
-                    <h3>{lawyer.name}</h3>
-                  </div>
-                  <p>{lawyer.firm}</p>
-                  <p>{lawyer.specialty}</p>
-                  <p>{lawyer.city}</p>
-                  <p>{lawyer.email}</p>
-                </article>
-                );
-              })}
-            </div>
-          </section>
+      <section className="login-home-hero" aria-labelledby="login-home-title">
+        <div className="login-home-hero-copy">
+          <h1 id="login-home-title">
+            Smart Legal Help <span>Instantly</span>
+          </h1>
+          <p>Ask questions, generate documents, or connect with a lawyer, all in one platform.</p>
+          <div className="login-home-hero-actions">
+            <Link href="/ai" className="login-home-button login-home-button-primary">
+              <LegalHomeIcon type="sparkles" />
+              Ask a Legal Question
+            </Link>
+            <Link href="/labor" className="login-home-button login-home-button-secondary">
+              <LegalHomeIcon type="calculator" />
+              Labor Calculator
+            </Link>
+          </div>
         </div>
 
-        <aside className="home-reference-sidebar">
-          {role === "admin" ? (
-            <section className="home-side-panel home-side-form-panel" id="lawyer-account-form">
-              <div className="home-side-heading">
-                <span className="home-side-badge">Admin only</span>
-                <h2>Create lawyer account</h2>
+        <div className="login-home-benefits" aria-label="Platform benefits">
+          {HERO_BENEFITS.map((benefit) => (
+            <article key={benefit.title} className="login-home-benefit-card">
+              <span>
+                <LegalHomeIcon type={benefit.icon} />
+              </span>
+              <div>
+                <h2>{benefit.title}</h2>
+                <p>{benefit.description}</p>
               </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
-              <form className="home-lawyer-form" onSubmit={handleCreateLawyer}>
-                <input value={lawyerForm.name} onChange={(event) => updateLawyerForm("name", event.target.value)} placeholder="Lawyer name" />
-                <input value={lawyerForm.email} onChange={(event) => updateLawyerForm("email", event.target.value)} placeholder="Lawyer email" />
-                <input value={lawyerForm.password} onChange={(event) => updateLawyerForm("password", event.target.value)} placeholder="Temporary password" type="password" />
-                <input value={lawyerForm.firm} onChange={(event) => updateLawyerForm("firm", event.target.value)} placeholder="Firm name" />
-                <input value={lawyerForm.specialty} onChange={(event) => updateLawyerForm("specialty", event.target.value)} placeholder="Specialty" />
-                <input value={lawyerForm.city} onChange={(event) => updateLawyerForm("city", event.target.value)} placeholder="City" />
-                <input value={lawyerForm.phone} onChange={(event) => updateLawyerForm("phone", event.target.value)} placeholder="Phone" />
-                <textarea value={lawyerForm.bio} onChange={(event) => updateLawyerForm("bio", event.target.value)} placeholder="Short lawyer bio" />
-                <button type="submit" className="home-primary-button">Create Lawyer Account</button>
-              </form>
-            </section>
-          ) : activeCase ? (
-            <section className="home-side-panel">
-              <div className="home-side-heading">
-                <span className="home-side-icon">
-                  <ShieldIcon />
+      <section className="login-home-action-section" aria-labelledby="quick-actions-title">
+        <div className="login-home-centered-heading">
+          <h2 id="quick-actions-title">What would you like to do?</h2>
+          <span aria-hidden="true" />
+        </div>
+
+        <div className="login-home-action-grid">
+          {QUICK_ACTIONS.map((action) => (
+            <Link key={action.title} href={action.href} className="login-home-action-card">
+              <span className={`login-home-action-icon ${action.tone}`}>
+                <LegalHomeIcon type={action.icon} />
+              </span>
+              <h3>{action.title}</h3>
+              <p>{action.description}</p>
+              <strong>
+                {action.cta}
+                <ArrowIcon />
+              </strong>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="login-home-platform-section" aria-labelledby="platform-title">
+        <div className="login-home-centered-heading">
+          <h2 id="platform-title">Everything you need in one legal platform</h2>
+        </div>
+
+        <div className="login-home-platform-grid">
+          {PLATFORM_FEATURES.map((feature) => (
+            <article key={feature.title} className="login-home-platform-item">
+              <span className="login-home-platform-icon">
+                <LegalHomeIcon type={feature.icon} />
+              </span>
+              <div>
+                <h3>{feature.title}</h3>
+                <ul>
+                  {feature.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="login-home-review-section" aria-labelledby="trusted-title">
+        <div className="login-home-centered-heading">
+          <h2 id="trusted-title">Trusted by thousands</h2>
+          <p>Real people, real results.</p>
+        </div>
+
+        <div className="login-home-review-row">
+          {featuredReviews.map((review) => (
+            <article key={review.id} className="login-home-review-card">
+              <StarRating rating={review.rating} />
+              <h3>{review.title}</h3>
+              <p>{review.review}</p>
+              <div className="login-home-review-author">
+                <span>{getInitials(review.name)}</span>
+                <strong>{review.name}</strong>
+              </div>
+            </article>
+          ))}
+          <Link href="/review" className="login-home-review-next" aria-label="Open all reviews">
+            <ArrowIcon />
+          </Link>
+        </div>
+      </section>
+
+      <section className="login-home-faq-section" aria-labelledby="popular-questions-title">
+        <div className="login-home-section-bar">
+          <h2 id="popular-questions-title">Popular Questions</h2>
+          <Link href="/faq">
+            Browse All FAQs
+            <ArrowIcon />
+          </Link>
+        </div>
+
+        {popularQuestions.length ? (
+          <div className="login-home-faq-grid">
+            {popularQuestions.map((item) => (
+              <Link key={item.id} href="/faq" className="login-home-faq-card">
+                <span className="login-home-faq-tag">
+                  <LegalHomeIcon type={getFAQIcon(item.category)} />
+                  {item.category}
                 </span>
-                <h2>{activeCase.case.title}</h2>
-              </div>
+                <h3>{item.question}</h3>
+                <p>{FAQ_SUMMARIES[item.question] || "Open the FAQ page to review the system guidance for this topic."}</p>
+                <strong>
+                  Learn More
+                  <ArrowIcon />
+                </strong>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="login-home-empty">Popular questions will appear here once the dashboard loads.</p>
+        )}
+      </section>
 
-              <p className="home-side-copy">
-                Assigned to {activeCase.lawyer.name}. Track the live case status and continue the protected thread when needed.
-              </p>
+      <section className="login-home-steps-section" id="how-it-works" aria-labelledby="how-it-works-title">
+        <div className="login-home-centered-heading">
+          <h2 id="how-it-works-title">How it works</h2>
+        </div>
 
-              <div className="home-case-progress">
-                <div className="home-case-progress-meta">
-                  <span>Progress</span>
-                  <strong>{activeCase.case.progressPercent}%</strong>
-                </div>
-                <div className="home-case-progress-bar">
-                  <div style={{ width: `${activeCase.case.progressPercent}%` }} />
-                </div>
-              </div>
+        <div className="login-home-steps">
+          {HOW_IT_WORKS.map((step, index) => (
+            <article key={step.title} className="login-home-step">
+              <span className="login-home-step-number">{index + 1}</span>
+              <span className="login-home-step-icon">
+                <LegalHomeIcon type={step.icon} />
+              </span>
+              <h3>{step.title}</h3>
+              <p>{step.description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
 
-              <div className="home-case-updates">
-                {activeCase.updates.map((step) => (
-                  <article key={step.id} className={`home-case-step ${step.state}`}>
-                    <span />
-                    <div>
-                      <h3>{step.label}</h3>
-                      <p>{step.state}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
+      <footer className="login-home-footer">
+        <div className="login-home-footer-brand">
+          <h2>LEGAL CONSULTANT</h2>
+          <p>Smart legal solutions. Anytime, anywhere.</p>
+        </div>
 
-              <Link href="/messaging" className="home-primary-button">Open Messaging</Link>
-            </section>
-          ) : (
-            <section className="home-side-panel">
-              <div className="home-side-heading">
-                <span className="home-side-icon">
-                  <ShieldIcon />
-                </span>
-                <h2>Protected Case Ready?</h2>
-              </div>
-
-              <p className="home-side-copy">
-                {role === "guest"
-                  ? "You can preview the platform, but creating a referral or joining a protected case requires a client account."
-                  : "Your account is ready. Start a referral to open a protected case and continue with direct lawyer coordination."}
-              </p>
-
-              {role === "guest" ? (
-                <Link href="/signup" className="home-primary-button">Create Client Account</Link>
-              ) : (
-                <Link href="/messaging" className="home-primary-button">Open Referral Workspace</Link>
-              )}
-            </section>
-          )}
-
-          <section className="home-side-panel">
-            <div className="home-section-heading">
-              <h2>Role Boundaries</h2>
-            </div>
-
-            <div className="home-boundary-list">
-              {ROLE_BOUNDARIES.map((item) => (
-                <article
-                  key={item.title}
-                  className={`home-boundary-row ${openBoundary === item.title ? "open" : ""}`}
-                >
-                  <button
-                    type="button"
-                    className="home-boundary-trigger"
-                    onClick={() =>
-                      setOpenBoundary((current) => (current === item.title ? null : item.title))
-                    }
-                    aria-expanded={openBoundary === item.title}
-                  >
-                    <h3>{item.title}</h3>
-                    <span className="home-boundary-arrow">
-                      <ArrowIcon />
-                    </span>
-                  </button>
-
-                  {openBoundary === item.title ? (
-                    <p>{item.description}</p>
-                  ) : null}
-                </article>
+        <nav className="login-home-footer-nav" aria-label="Home footer">
+          {FOOTER_COLUMNS.map((column) => (
+            <div key={column.title}>
+              <h3>{column.title}</h3>
+              {column.links.map((link) => (
+                <Link key={link.label} href={link.href}>
+                  {link.label}
+                </Link>
               ))}
             </div>
-          </section>
-        </aside>
-      </section>
-    </div>
+          ))}
+        </nav>
+
+        <div className="login-home-social">
+          <h3>Follow us</h3>
+          <div>
+            <a href="#" aria-label="Facebook">f</a>
+            <a href="#" aria-label="Twitter">t</a>
+            <a href="#" aria-label="LinkedIn">in</a>
+          </div>
+          <p>Copyright 2025 Legal Consultant. All rights reserved.</p>
+        </div>
+      </footer>
+    </main>
   );
 }
