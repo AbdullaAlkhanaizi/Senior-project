@@ -21,8 +21,14 @@ type Config struct {
 }
 
 func Load() Config {
+	port := strings.TrimSpace(os.Getenv("PORT"))
+	addr := envOrDefault("ADDR", ":8080")
+	if port != "" {
+		addr = "0.0.0.0:" + port
+	}
+
 	return Config{
-		Addr:            envOrDefault("ADDR", ":8080"),
+		Addr:            addr,
 		FrontendOrigin:  envOrDefault("FRONTEND_ORIGIN", "http://localhost:3000"),
 		DatabasePath:    envOrDefault("DATABASE_PATH", "data/legal_consultant.db"),
 		UploadDir:       envOrDefault("UPLOAD_DIR", "uploads"),
