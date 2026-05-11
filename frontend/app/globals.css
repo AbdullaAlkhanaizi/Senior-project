@@ -5518,67 +5518,26 @@ a.sm-btn:hover {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  padding: 24px 32px;
+  width: min(1520px, 100%);
+  padding: 24px clamp(16px, 2vw, 32px) 40px;
   color: var(--text-primary);
   font-family: "Inter", sans-serif;
-  min-height: 100vh;
-  max-width: 1400px;
+  min-height: calc(100vh - 110px);
   margin: 0 auto;
-}
-
-/* Top Navigation Tabs */
-.ai-top-nav {
-  display: flex;
-  gap: 16px;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(12px);
-  border-radius: 20px;
-  width: fit-content;
-  margin-bottom: 12px;
-  border: 1px solid var(--border-glass);
-}
-
-.nav-tab {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 24px;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--text-muted);
-  font-weight: 500;
-  transition: all 0.3s ease;
-  box-shadow: none;
-  font-size: 0.95rem;
-}
-
-.nav-tab.active {
-  background: #fff;
-  color: var(--accent-terracotta);
-  box-shadow: 0 4px 12px rgba(188, 95, 58, 0.15);
-}
-
-.nav-tab:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.6);
-  color: var(--text-primary);
+  box-sizing: border-box;
 }
 
 /* Main Grid Layout */
 .main-ai-grid {
   display: grid;
-  grid-template-columns: 280px 1fr 280px;
+  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
   gap: 24px;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 @media (max-width: 1100px) {
   .main-ai-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .right-insights-panel {
-    display: none;
+    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   }
 }
 
@@ -5586,6 +5545,11 @@ a.sm-btn:hover {
   .main-ai-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.left-tool-panel,
+.chat-workspace-area {
+  min-width: 0;
 }
 
 /* Premium Card (Glassmorphism) */
@@ -5608,6 +5572,12 @@ a.sm-btn:hover {
   font-size: 1.8rem;
   margin: 0;
   color: var(--text-primary);
+}
+
+.tool-form {
+  min-height: clamp(620px, calc(100vh - 210px), 860px);
+  position: sticky;
+  top: 24px;
 }
 
 .tool-form .subtitle {
@@ -5674,8 +5644,8 @@ a.sm-btn:hover {
   border: 1px solid var(--border-soft);
   border-radius: 14px;
   padding: 14px 18px;
-  min-height: 100px;
-  resize: none;
+  min-height: 170px;
+  resize: vertical;
   font-size: 0.9rem;
   outline: none;
 }
@@ -5726,8 +5696,7 @@ a.sm-btn:hover {
 /* Chat Workspace Area */
 .main-chat-box {
   padding: 0;
-  min-height: 600px;
-  max-height: 720px;
+  min-height: clamp(620px, calc(100vh - 210px), 860px);
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.3);
@@ -5763,15 +5732,21 @@ a.sm-btn:hover {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-height: 0;
 }
 
 .msg-bubble {
-  max-width: 80%;
+  max-width: min(80%, 760px);
   padding: 16px 20px;
   border-radius: 18px;
   font-size: 0.95rem;
   line-height: 1.55;
   position: relative;
+}
+
+.msg-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 .msg-bubble.user {
@@ -5826,6 +5801,7 @@ a.sm-btn:hover {
 
 .input-field-wrapper input {
   flex: 1;
+  min-width: 0;
   border: none;
   outline: none;
   font-size: 0.95rem;
@@ -5850,6 +5826,8 @@ a.sm-btn:hover {
   padding: 10px 24px;
   border-radius: 10px;
   font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 /* AI Insights Sidebars */
@@ -6009,6 +5987,50 @@ a.sm-btn:hover {
 .portal-logout-btn:hover,
 .portal-login-link:hover {
   transform: translateY(-1px);
+}
+
+@media (max-width: 800px) {
+  .luxury-ai-workspace {
+    min-height: auto;
+    padding-bottom: 28px;
+  }
+
+  .tool-form,
+  .main-chat-box {
+    min-height: 0;
+    position: static;
+  }
+
+  .chat-message-flow-v3 {
+    max-height: 56vh;
+    padding: 20px;
+  }
+
+  .chat-box-input,
+  .chat-box-header,
+  .premium-card {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .msg-bubble {
+    max-width: 100%;
+  }
+
+  .input-field-wrapper {
+    flex-wrap: wrap;
+  }
+
+  .input-field-wrapper input {
+    width: 100%;
+    order: 2;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .send-action-btn {
+    margin-left: auto;
+  }
 }
 
 .account-summary {
