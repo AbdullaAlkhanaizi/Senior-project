@@ -366,8 +366,8 @@ func (s *Store) CreateCase(ctx context.Context, req models.CreateCaseRequest) (m
 
 func (s *Store) DecideCase(ctx context.Context, caseID int64, actorName string, req models.CaseDecisionRequest) (models.CaseDetails, error) {
 	decision := strings.ToLower(strings.TrimSpace(req.Decision))
-	if decision != "accepted" && decision != "declined" {
-		return models.CaseDetails{}, errors.New("decision must be accepted or declined")
+	if decision != "accepted" && decision != "declined" && decision != "completed" {
+		return models.CaseDetails{}, errors.New("decision must be accepted, declined, or completed")
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -385,8 +385,12 @@ func (s *Store) DecideCase(ctx context.Context, caseID int64, actorName string, 
 	if err != nil {
 		return models.CaseDetails{}, err
 	}
-	if currentDecision != "pending" {
+	
+	if decision != "completed" && currentDecision != "pending" {
 		return models.CaseDetails{}, fmt.Errorf("case is already %s", currentDecision)
+	}
+	if decision == "completed" && currentDecision != "accepted" {
+		return models.CaseDetails{}, errors.New("only accepted cases can be completed")
 	}
 
 	now := time.Now().UTC().Format(timeLayout)
@@ -395,7 +399,11 @@ func (s *Store) DecideCase(ctx context.Context, caseID int64, actorName string, 
 	if decision == "declined" {
 		status = "Declined by lawyer"
 		systemBody = fmt.Sprintf("%s declined the case.", actorName)
+	} else if decision == "completed" {
+		status = "Case completed"
+		systemBody = fmt.Sprintf("%s ended the case.", actorName)
 	}
+
 	if note := strings.TrimSpace(req.Note); note != "" {
 		systemBody = fmt.Sprintf("%s %s the case. Note: %s", actorName, decision, note)
 	}

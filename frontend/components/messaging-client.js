@@ -66,7 +66,11 @@ function getLawyerTheme(key = "") {
 export default function MessagingClient() {
   const wsRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const [otherTyping, setOtherTyping] = useState(false);
+
+  const [draggedStepId, setDraggedStepId] = useState(null);
+  const [dragOverStepId, setDragOverStepId] = useState(null);
 
   const [session, setSession] = useState(null);
   const [lawyers, setLawyers] = useState([]);
@@ -86,8 +90,14 @@ export default function MessagingClient() {
   const [clientView, setClientView] = useState("list");
   const [lawyerView, setLawyerView] = useState("list");
   const [showCreateCaseForm, setShowCreateCaseForm] = useState(false);
-  const [draggedStepId, setDraggedStepId] = useState(null);
-  const [dragOverStepId, setDragOverStepId] = useState(null);
+  const [showEndCaseForm, setShowEndCaseForm] = useState(false);
+
+  useEffect(() => {
+    const timerId = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+    return () => clearTimeout(timerId);
+  }, [activeCase?.messages, otherTyping]);
 
   const currentSenderType = session?.role === "lawyer" ? "lawyer" : session?.role === "client" ? "client" : "";
 
@@ -221,6 +231,16 @@ export default function MessagingClient() {
     }, {});
   }, [lawyers]);
 
+  const sortedCases = useMemo(() => {
+    return [...cases].sort((a, b) => {
+      const aIsCompleted = a.decisionStatus === "completed";
+      const bIsCompleted = b.decisionStatus === "completed";
+      if (aIsCompleted && !bIsCompleted) return 1;
+      if (!aIsCompleted && bIsCompleted) return -1;
+      return 0;
+    });
+  }, [cases]);
+
   function formatTimestamp(value) {
     return new Date(value).toLocaleString([], {
       month: "short",
@@ -312,7 +332,10 @@ export default function MessagingClient() {
         key={item.id}
         type="button"
         className={`case-list-item case-faq-card ${selectedCaseId === item.id ? "selected" : ""}`}
-        style={accentKey ? getLawyerTheme(accentKey) : undefined}
+        style={{
+          ...(accentKey ? getLawyerTheme(accentKey) : {}),
+          ...(item.decisionStatus === "completed" ? { border: "2px solid #4CAF50" } : {})
+        }}
         onClick={() => handleSelectCase(item.id)}
       >
         <div className="case-faq-card-top">
@@ -433,6 +456,7 @@ export default function MessagingClient() {
               <small>Typing...</small>
             </div>
           ) : null}
+          <div ref={messagesEndRef} />
         </div>
 
         {canMessage ? (
@@ -472,7 +496,9 @@ export default function MessagingClient() {
                 ? isLawyer
                   ? "This request was declined. Return to your case list to review other requests."
                   : "This request was declined. Create a new request with another lawyer to continue."
-                : "Sign in to continue."}
+                : details.case.decisionStatus === "completed"
+                  ? "This case has been completed. The conversation is now locked."
+                  : "Sign in to continue."}
           </p>
         )}
       </div>
@@ -510,6 +536,7 @@ export default function MessagingClient() {
         setLawyerView("details");
       }
       setDecisionNote("");
+      setShowEndCaseForm(false);
       setStatus("");
     } catch (requestError) {
       setError(requestError.message);
@@ -968,10 +995,9 @@ export default function MessagingClient() {
               <div className="case-list">
                 {loadingCases ? (
                   <p className="muted">Loading cases...</p>
-                ) : cases.length > 0 ? (
-                  cases.map((item) => renderCaseListItem(item, item.lawyerName, item.lawyerName))
-                ) : (
-                  <p className="muted">No cases yet.</p>
+                ) : sortedCases.length > 0 ? (
+                  sortedCases.map((item) => renderCaseListItem(item, item.lawyerName, item.lawyerName))
+                ) : (                  <p className="muted">No cases yet.</p>
                 )}
               </div>
 
@@ -1198,12 +1224,11 @@ export default function MessagingClient() {
               <div className="case-list">
                 {loadingCases ? (
                   <p className="muted">Loading cases...</p>
-                ) : cases.length > 0 ? (
-                  cases.map((item) => renderCaseListItem(item, item.clientName, item.lawyerName || item.title))
+                ) : sortedCases.length > 0 ? (
+                  sortedCases.map((item) => renderCaseListItem(item, item.clientName, item.lawyerName || item.title))
                 ) : (
                   <p className="muted">No case requests have been assigned to this lawyer account yet.</p>
-                )}
-              </div>
+                )}              </div>
             </div>
           ) : activeCase ? (
             <div className="panel messaging-panel">
@@ -1212,9 +1237,22 @@ export default function MessagingClient() {
                   <p className="panel-kicker">Lawyer workspace</p>
                   <h2>{caseLabel}</h2>
                 </div>
-                <button type="button" className="button-secondary panel-back-button" onClick={() => setLawyerView("list")}>
-                  Back to cases
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  {activeCase.case.decisionStatus === "accepted" ? (
+                    <button
+                      type="button"
+                      className="button-secondary panel-back-button"
+                      onClick={() => setShowEndCaseForm(true)}
+                      disabled={activeCase.case.progressPercent !== 100}
+                      title={activeCase.case.progressPercent !== 100 ? "Case must be 100% complete" : ""}
+                    >
+                      End case
+                    </button>
+                  ) : null}
+                  <button type="button" className="button-secondary panel-back-button" onClick={() => setLawyerView("list")}>
+                    Back to cases
+                  </button>
+                </div>
               </div>
 
               {activeCase.case.decisionStatus === "pending" ? (
@@ -1231,6 +1269,32 @@ export default function MessagingClient() {
                   <div className="decision-actions">
                     <button type="button" onClick={() => handleDecision("accepted")}>Accept case</button>
                     <button type="button" className="button-secondary" onClick={() => handleDecision("declined")}>Decline case</button>
+                  </div>
+                </div>
+              ) : null}
+
+              {showEndCaseForm ? (
+                <div className="decision-panel">
+                  <p className="hero-copy">
+                    Please provide a final note or reason for completing this case. The client will see this note, and the conversation will be locked.
+                  </p>
+                  <textarea
+                    className="decision-note"
+                    value={decisionNote}
+                    onChange={(event) => setDecisionNote(event.target.value)}
+                    placeholder="Reason for ending case"
+                  />
+                  <div className="decision-actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEndCaseForm(false);
+                        handleDecision("completed");
+                      }}
+                    >
+                      Complete case
+                    </button>
+                    <button type="button" className="button-secondary" onClick={() => setShowEndCaseForm(false)}>Cancel</button>
                   </div>
                 </div>
               ) : null}
@@ -1354,12 +1418,13 @@ export default function MessagingClient() {
           <div className="case-list">
             {loadingCases ? (
               <p className="muted">Loading cases...</p>
-            ) : cases.length > 0 ? (
-              cases.map((item) => (
+            ) : sortedCases.length > 0 ? (
+              sortedCases.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   className={`case-list-item ${selectedCaseId === item.id ? "selected" : ""}`}
+                  style={item.decisionStatus === "completed" ? { border: "2px solid #4CAF50" } : undefined}
                   onClick={() => handleSelectCase(item.id)}
                 >
                   <div className="case-list-top">
@@ -1474,8 +1539,47 @@ export default function MessagingClient() {
               <p className="panel-kicker">{isLawyer ? "Lawyer workspace" : "Case workspace"}</p>
               <h2>{activeCase ? caseLabel : "Messaging and case progress"}</h2>
             </div>
-            <span className="badge">{activeCase?.case?.status || "No case selected"}</span>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              {isLawyer && activeCase?.case?.decisionStatus === "accepted" ? (
+                <button
+                  type="button"
+                  className="button-secondary panel-back-button"
+                  onClick={() => setShowEndCaseForm(true)}
+                  disabled={activeCase.case.progressPercent !== 100}
+                  title={activeCase.case.progressPercent !== 100 ? "Case must be 100% complete" : ""}
+                >
+                  End case
+                </button>
+              ) : null}
+              <span className="badge">{activeCase?.case?.status || "No case selected"}</span>
+            </div>
           </div>
+
+          {showEndCaseForm && isLawyer && activeCase?.case?.decisionStatus === "accepted" ? (
+            <div className="decision-panel">
+              <p className="hero-copy">
+                Please provide a final note or reason for completing this case. The client will see this note, and the conversation will be locked.
+              </p>
+              <textarea
+                className="decision-note"
+                value={decisionNote}
+                onChange={(event) => setDecisionNote(event.target.value)}
+                placeholder="Reason for ending case"
+              />
+              <div className="decision-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEndCaseForm(false);
+                    handleDecision("completed");
+                  }}
+                >
+                  Complete case
+                </button>
+                <button type="button" className="button-secondary" onClick={() => setShowEndCaseForm(false)}>Cancel</button>
+              </div>
+            </div>
+          ) : null}
 
           {activeCase ? (
             <>
