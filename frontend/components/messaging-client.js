@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 
 import {
   API_BASE,
@@ -64,6 +64,10 @@ function getLawyerTheme(key = "") {
 }
 
 export default function MessagingClient() {
+  const wsRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+  const [otherTyping, setOtherTyping] = useState(false);
+
   const [session, setSession] = useState(null);
   const [lawyers, setLawyers] = useState([]);
   const [cases, setCases] = useState([]);
@@ -84,6 +88,8 @@ export default function MessagingClient() {
   const [showCreateCaseForm, setShowCreateCaseForm] = useState(false);
   const [draggedStepId, setDraggedStepId] = useState(null);
   const [dragOverStepId, setDragOverStepId] = useState(null);
+
+  const currentSenderType = session?.role === "lawyer" ? "lawyer" : session?.role === "client" ? "client" : "";
 
   useEffect(() => {
     const currentSession = loadSession();
@@ -128,6 +134,65 @@ export default function MessagingClient() {
     setStepDrafts(buildStepDrafts(activeCase?.updates || []));
   }, [activeCase]);
 
+  useEffect(() => {
+    let ws;
+    let reconnectTimer;
+
+    function connect() {
+      if (!activeCase?.case?.id || !session?.token) return;
+
+      const wsUrl = new URL(`${API_BASE}/api/cases/${activeCase.case.id}/ws`, window.location.href);
+      wsUrl.protocol = wsUrl.protocol.replace('http', 'ws');
+      wsUrl.searchParams.set("token", session.token);
+
+      ws = new WebSocket(wsUrl.toString());
+      wsRef.current = ws;
+      
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          
+          if (message.type === "typing") {
+            if (message.senderType !== currentSenderType) {
+              setOtherTyping(true);
+              clearTimeout(typingTimeoutRef.current);
+              typingTimeoutRef.current = setTimeout(() => setOtherTyping(false), 3000);
+            }
+            return;
+          }
+
+          setActiveCase((current) => {
+            if (!current || !current.messages) return current;
+            if (current.messages.some(m => m.id === message.id)) {
+              return current;
+            }
+            return {
+              ...current,
+              messages: [...current.messages, message]
+            };
+          });
+        } catch (err) {
+          console.error("WS parsing error:", err);
+        }
+      };
+
+      ws.onclose = () => {
+        wsRef.current = null;
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+    }
+
+    connect();
+
+    return () => {
+      clearTimeout(reconnectTimer);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
+    };
+  }, [activeCase?.case?.id, session?.token, currentSenderType]);
+
   const role = session?.role || "guest";
   const isAdmin = role === "admin";
   const isGuest = role === "guest";
@@ -135,7 +200,6 @@ export default function MessagingClient() {
   const isLawyer = role === "lawyer";
   const selectedLawyer = lawyers.find((lawyer) => lawyer.id === Number(selectedLawyerId));
   const canMessage = activeCase?.case?.decisionStatus === "accepted" && !isGuest;
-  const currentSenderType = isLawyer ? "lawyer" : isClient ? "client" : "";
   const isExpandedWorkspace =
     (isClient && (clientView === "details" || clientView === "create")) ||
     (isLawyer && lawyerView === "details");
@@ -359,6 +423,16 @@ export default function MessagingClient() {
               <p>{emptyMessage}</p>
             </div>
           )}
+          {otherTyping ? (
+            <div className="typing-indicator-container">
+              <div className="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <small>Typing...</small>
+            </div>
+          ) : null}
         </div>
 
         {canMessage ? (
@@ -372,7 +446,12 @@ export default function MessagingClient() {
             </div>
             <textarea
               value={messageInput}
-              onChange={(event) => setMessageInput(event.target.value)}
+              onChange={(event) => {
+                setMessageInput(event.target.value);
+                if (wsRef.current?.readyState === WebSocket.OPEN) {
+                  wsRef.current.send(JSON.stringify({ type: "typing", senderType: currentSenderType }));
+                }
+              }}
               placeholder={placeholderText}
             />
             <div className="message-actions">

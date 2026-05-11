@@ -12,6 +12,7 @@ type Server struct {
 	store  *store.Store
 	config config.Config
 	ai     *ai.Client
+	wsHub  *wsHub
 }
 
 func NewServer(dataStore *store.Store, cfg config.Config) *Server {
@@ -19,6 +20,7 @@ func NewServer(dataStore *store.Store, cfg config.Config) *Server {
 		store:  dataStore,
 		config: cfg,
 		ai:     ai.NewClient(cfg.DeepSeekAPIKey, cfg.DeepSeekBaseURL, cfg.DeepSeekModel),
+		wsHub:  newWSHub(),
 	}
 }
 

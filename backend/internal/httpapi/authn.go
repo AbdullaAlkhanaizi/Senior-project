@@ -51,13 +51,18 @@ func (s *Server) issueToken(user models.AuthResponse) (string, error) {
 
 func (s *Server) viewerFromRequest(r *http.Request) (*viewer, error) {
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
-	if header == "" {
-		return nil, nil
+	var token string
+	if header != "" {
+		token = strings.TrimPrefix(header, "Bearer ")
+		if token == header {
+			return nil, errUnauthorized
+		}
+	} else {
+		token = r.URL.Query().Get("token")
 	}
 
-	token := strings.TrimPrefix(header, "Bearer ")
-	if token == header {
-		return nil, errUnauthorized
+	if token == "" {
+		return nil, nil
 	}
 
 	return s.parseToken(token)

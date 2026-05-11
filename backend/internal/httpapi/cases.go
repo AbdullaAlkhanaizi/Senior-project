@@ -144,6 +144,8 @@ func (s *Server) handleCaseRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleCaseDecision(w, r, caseID, current)
 	case "updates":
 		s.handleCaseUpdates(w, r, caseID, parts, current)
+	case "ws":
+		s.handleCaseWS(w, r, caseID, current)
 	default:
 		writeError(w, http.StatusNotFound, "not found")
 	}
@@ -178,6 +180,8 @@ func (s *Server) handleCaseMessages(w http.ResponseWriter, r *http.Request, case
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	s.broadcastMessage(caseID, message)
 
 	writeJSON(w, http.StatusCreated, message)
 }
@@ -224,6 +228,8 @@ func (s *Server) handleCaseAttachments(w http.ResponseWriter, r *http.Request, c
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	s.broadcastMessage(caseID, message)
 
 	writeJSON(w, http.StatusCreated, message)
 }
