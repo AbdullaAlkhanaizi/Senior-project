@@ -37,7 +37,7 @@ func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reply, err := s.ai.Chat(r.Context(), ai.ChatRequest{
-		SystemPrompt: buildAISystemPrompt(mode, req.Category, s.config.AIJurisdiction),
+		SystemPrompt: buildAISystemPrompt(mode, req.Category, s.config.AIJurisdiction, s.buildAILawsContext(req.Category, messages)),
 		Messages:     messages,
 	})
 	if err != nil {
@@ -103,7 +103,7 @@ func sanitizeAIMessages(input []models.AIChatMessage) ([]ai.Message, error) {
 	return messages, nil
 }
 
-func buildAISystemPrompt(mode, category, jurisdiction string) string {
+func buildAISystemPrompt(mode, category, jurisdiction, lawsContext string) string {
 	var builder strings.Builder
 
 	builder.WriteString("You are an AI legal intake assistant for a legal consultant platform. ")
@@ -126,12 +126,39 @@ func buildAISystemPrompt(mode, category, jurisdiction string) string {
 		builder.WriteString("The user wants guidance on a legal question. Explain the likely rule, penalties, risks, and common next steps in plain language. ")
 	}
 
+	builder.WriteString("When Bahrain law excerpts are provided from the legal knowledge base, use them as the primary source for your answer. ")
+	builder.WriteString("Do not invent statutes, article numbers, penalties, or procedures that are not supported by the provided excerpts. ")
+	builder.WriteString("If the knowledge base does not clearly answer the question, say that explicitly and explain what is missing. ")
 	builder.WriteString("When facts are missing, say what is unclear and ask targeted follow-up questions. ")
 	builder.WriteString("If the issue involves urgent deadlines, criminal exposure, violence, child safety, immigration, or major financial risk, urge the user to contact a licensed local lawyer immediately. ")
 	builder.WriteString("Keep the answer structured with short headings: Summary, Key Points, Next Steps. ")
 	builder.WriteString("End with a short reminder that the answer is informational and should be reviewed by a licensed lawyer for case-specific action.")
 
+	if strings.TrimSpace(lawsContext) != "" {
+		builder.WriteString("\n\n--- BAHRAIN LAW KNOWLEDGE BASE ---\n")
+		builder.WriteString(lawsContext)
+		builder.WriteString("\n----------------------------\n")
+	}
+
 	return builder.String()
+}
+
+func (s *Server) buildAILawsContext(category string, messages []ai.Message) string {
+	if s == nil || s.laws == nil {
+		return ""
+	}
+
+	searchTexts := make([]string, 0, len(messages))
+	for _, message := range messages {
+		if message.Role != "user" {
+			continue
+		}
+		if content := strings.TrimSpace(message.Content); content != "" {
+			searchTexts = append(searchTexts, content)
+		}
+	}
+
+	return s.laws.RelevantContext(category, searchTexts, 4)
 }
 
 func suggestedActionsForMode(mode string) []string {
