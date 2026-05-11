@@ -300,7 +300,7 @@ func tokenize(value string) []string {
 func categoryKeywords(category string) []string {
 	switch strings.TrimSpace(category) {
 	case "Traffic Law":
-		return []string{"traffic", "road", "vehicle", "driving", "driver", "license", "accident"}
+		return []string{"traffic", "road", "vehicle", "driving", "driver", "license", "accident", "signal", "light", "red", "stop", "sign", "speed"}
 	case "Personal Status Law":
 		return []string{"marriage", "divorce", "custody", "family", "alimony", "inheritance"}
 	case "Civil & Commercial Law":
@@ -311,8 +311,6 @@ func categoryKeywords(category string) []string {
 		return []string{"administrative", "government", "ministry", "authority", "permit", "license"}
 	case "Constitutional Law":
 		return []string{"constitution", "constitutional", "rights", "assembly", "speech"}
-	case "Sharia Law (Sunni or Jafari)":
-		return []string{"sharia", "sunni", "jafari", "islamic", "inheritance", "marriage"}
 	case "Military Law":
 		return []string{"military", "armed", "service", "defense", "discipline"}
 	case "Labor & Employment Law":

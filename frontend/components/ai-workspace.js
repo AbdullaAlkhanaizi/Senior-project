@@ -73,7 +73,6 @@ const ISSUE_OPTIONS = [
   "Criminal Law",
   "Administrative Law",
   "Constitutional Law",
-  "Sharia Law (Sunni or Jafari)",
   "Military Law",
   "Labor & Employment Law",
   "Property & Tenancy Law"
@@ -128,15 +127,19 @@ const STARTER_PROMPTS = [
 ];
 
 function timestamp() {
-  return new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  }).format(new Date());
 }
 
-function buildWelcomeMessage(mode) {
+function buildWelcomeMessage(mode, includeTimestamp = true) {
   if (mode === "create") {
     return {
       role: "assistant",
       text: "Describe the document you need. I can draft a first version with placeholders and flag sections that still need lawyer review.",
-      timestamp: timestamp()
+      timestamp: includeTimestamp ? timestamp() : ""
     };
   }
 
@@ -144,14 +147,14 @@ function buildWelcomeMessage(mode) {
     return {
       role: "assistant",
       text: "Paste the document text or clause and tell me what you want checked. I will highlight likely risks, ambiguities, and follow-up questions.",
-      timestamp: timestamp()
+      timestamp: includeTimestamp ? timestamp() : ""
     };
   }
 
   return {
     role: "assistant",
     text: "Ask your legal question and include any dates, notices, or deadlines that matter. I will give general guidance, not case-specific legal advice.",
-    timestamp: timestamp()
+    timestamp: includeTimestamp ? timestamp() : ""
   };
 }
 
@@ -201,7 +204,7 @@ export default function AIWorkspace() {
   const [issueCategory, setIssueCategory] = useState(ISSUE_OPTIONS[0]);
   const [details, setDetails] = useState("");
   const [chatInput, setChatInput] = useState("");
-  const [messages, setMessages] = useState(() => [buildWelcomeMessage("ask")]);
+  const [messages, setMessages] = useState(() => [buildWelcomeMessage("ask", false)]);
   const [disclaimer, setDisclaimer] = useState("");
   const [activeModel, setActiveModel] = useState("");
   const [suggestedActions, setSuggestedActions] = useState([]);
@@ -426,7 +429,7 @@ export default function AIWorkspace() {
                       </div>
                       <div>
                         <p>{msg.text}</p>
-                        <span className="caption">{msg.timestamp}</span>
+                        {msg.timestamp ? <span className="caption">{msg.timestamp}</span> : null}
                       </div>
                     </div>
                   )))}
@@ -465,72 +468,7 @@ export default function AIWorkspace() {
             </footer>
           </div>
         </main>
-
-        {/* Right Column: AI Insights */}
-        <aside className="right-insights-panel">
-          <div className="premium-card insight-widget">
-            <div className="widget-header">
-              <LightbulbIcon /> <h3>Suggested Actions</h3>
-            </div>
-            {(suggestedActions.length ? suggestedActions : [
-              "Add dates and deadlines for more precise guidance.",
-              "Escalate to a lawyer for case-specific review.",
-              "Use Analyze Document for clauses, notices, or contracts."
-            ]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                className="insight-card-item solid"
-                onClick={() => setChatInput(item)}
-                disabled={activeTab === "find"}
-              >
-                <div className="flex-row">
-                  <p>{item}</p>
-                  <ChevronRight />
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="premium-card insight-widget">
-            <div className="widget-header">
-              <LightbulbIcon /> <h3>Quick Start</h3>
-              <DotsHorizontalIcon />
-            </div>
-            {STARTER_PROMPTS.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                className="insight-card-item solid"
-                onClick={() => applyStarter(item)}
-              >
-                <div className="flex-row">
-                  <p>{item.label}</p>
-                  <ChevronRight />
-                </div>
-              </button>
-            ))}
-            {faqs.slice(0, 3).map((faq) => (
-              <button
-                key={faq.id}
-                type="button"
-                className="insight-card-item"
-                onClick={() => applyStarter({
-                  label: faq.question,
-                  mode: "ask",
-                  category: faq.category || ISSUE_OPTIONS[0],
-                  prompt: faq.question
-                })}
-              >
-                <span className="caption">{faq.category}</span>
-                <div className="flex-row">
-                  <p>{faq.question}</p>
-                  <ChevronRight />
-                </div>
-              </button>
-            ))}
-          </div>
-        </aside>
+        
       </div>
 
     </div>

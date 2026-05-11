@@ -106,33 +106,21 @@ func sanitizeAIMessages(input []models.AIChatMessage) ([]ai.Message, error) {
 func buildAISystemPrompt(mode, category, jurisdiction, lawsContext string) string {
 	var builder strings.Builder
 
-	builder.WriteString("You are an AI legal intake assistant for a legal consultant platform. ")
-	builder.WriteString("Provide practical, careful, general legal information and drafting help, but never claim to be a licensed lawyer or say your answer is final legal advice. ")
-	builder.WriteString("Assume the relevant jurisdiction is ")
+	builder.WriteString("You are a precise AI legal assistant. Assume the relevant jurisdiction is ")
 	builder.WriteString(defaultString(strings.TrimSpace(jurisdiction), "Bahrain"))
-	builder.WriteString(" unless the user clearly says otherwise. ")
-	if strings.TrimSpace(category) != "" {
-		builder.WriteString("The current issue category is ")
-		builder.WriteString(strings.TrimSpace(category))
-		builder.WriteString(". ")
-	}
+	builder.WriteString(". ")
 
-	switch mode {
-	case "create":
-		builder.WriteString("The user wants help creating a legal document. Draft a practical first version with clear placeholders, assumptions, and sections that need lawyer review. ")
-	case "analyze":
-		builder.WriteString("The user wants help analyzing a legal document or clause. Highlight risks, ambiguities, missing protections, deadlines, and follow-up questions. ")
-	default:
-		builder.WriteString("The user wants guidance on a legal question. Explain the likely rule, penalties, risks, and common next steps in plain language. ")
-	}
+	// 1. Force the exact output structure requiring formal titles
+	builder.WriteString("CRITICAL INSTRUCTION: You MUST answer the user's question in a single concise sentence following EXACTLY this structure:\n")
+	builder.WriteString("[Yes/No], [briefly state what is allowed or prohibited], as per [Exact Formal Title of the Law/Decree and Article].\n\n")
 
-	builder.WriteString("When Bahrain law excerpts are provided from the legal knowledge base, use them as the primary source for your answer. ")
-	builder.WriteString("Do not invent statutes, article numbers, penalties, or procedures that are not supported by the provided excerpts. ")
-	builder.WriteString("If the knowledge base does not clearly answer the question, say that explicitly and explain what is missing. ")
-	builder.WriteString("When facts are missing, say what is unclear and ask targeted follow-up questions. ")
-	builder.WriteString("If the issue involves urgent deadlines, criminal exposure, violence, child safety, immigration, or major financial risk, urge the user to contact a licensed local lawyer immediately. ")
-	builder.WriteString("Keep the answer structured with short headings: Summary, Key Points, Next Steps. ")
-	builder.WriteString("End with a short reminder that the answer is informational and should be reviewed by a licensed lawyer for case-specific action.")
+	// 2. Enforce formal citations for both DB hits and fallbacks
+	builder.WriteString("Strict Output Rules & Logic:\n")
+	builder.WriteString("1. Start exactly with 'Yes,' or 'No,'.\n")
+	builder.WriteString("2. First, check the BAHRAIN LAW KNOWLEDGE BASE below. If an excerpt answers the prompt, cite its exact 'Title:' field at the end.\n")
+	builder.WriteString("3. FALLBACK RULE: If the provided excerpts are irrelevant or missing, use your general foundational knowledge of Bahrain law to answer correctly. When answering from general knowledge, you MUST cite the formal statute, Legislative Decree, or specific Article (e.g., 'Legislative Decree No. 23 of 2014 Promulgating the Traffic Law, Article 50') instead of a generic title.\n")
+	builder.WriteString("4. Keep the middle explanation concise and under 15 words.\n")
+	builder.WriteString("5. Absolutely NO introductory text, disclaimers, extra paragraphs, or bullet points.\n")
 
 	if strings.TrimSpace(lawsContext) != "" {
 		builder.WriteString("\n\n--- BAHRAIN LAW KNOWLEDGE BASE ---\n")
