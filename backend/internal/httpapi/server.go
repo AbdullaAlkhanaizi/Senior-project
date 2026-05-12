@@ -22,7 +22,7 @@ func NewServer(dataStore *store.Store, cfg config.Config) *Server {
 	server := &Server{
 		store:  dataStore,
 		config: cfg,
-		ai:     ai.NewClient(cfg.GeminiAPIKey, cfg.GeminiBaseURL, cfg.GeminiModel),
+		ai:     ai.NewClient(cfg.DeepSeekAPIKey, cfg.DeepSeekBaseURL, cfg.DeepSeekModel),
 		wsHub:  newWSHub(),
 	}
 

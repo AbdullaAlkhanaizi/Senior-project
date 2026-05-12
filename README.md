@@ -68,9 +68,9 @@ $env:ADMIN_NAME="Your Admin Name"
 $env:ADMIN_EMAIL="you@example.com"
 $env:ADMIN_PASSWORD="UseAStrongPassword"
 $env:AUTH_SECRET="replace-this-in-real-use"
-$env:GEMINI_API_KEY="your-gemini-key"
-$env:GEMINI_MODEL="gemini-2.5-flash"
-$env:GEMINI_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai"
+$env:DEEPSEEK_API_KEY="your-deepseek-key"
+$env:DEEPSEEK_MODEL="deepseek-chat"
+$env:DEEPSEEK_BASE_URL="https://api.deepseek.com"
 $env:AI_JURISDICTION="Bahrain"
 $env:AI_LAWS_DB_PATH="data/laws_db.json"
 ```
@@ -106,31 +106,31 @@ If you only want to change routing, edit the files in `frontend/app/`.
 
 ## Implement your chatbot later
 
-The AI page is now wired to a backend chat endpoint that can call Gemini when `GEMINI_API_KEY` is set. The backend also has a clear escalation path:
+The AI page is now wired to a backend chat endpoint that can call DeepSeek when `DEEPSEEK_API_KEY` is set. The backend also has a clear escalation path:
 
 - Basic questions stay in the chatbot.
 - Complex questions can create a case and assign a lawyer.
 - The client and lawyer can continue through the messaging workspace.
 
-### Gemini-backed AI assistant
+### DeepSeek-backed AI assistant
 
 The backend expects these environment variables:
 
 ```powershell
-$env:GEMINI_API_KEY="your-gemini-key"
-$env:GEMINI_MODEL="gemini-2.5-flash"
-$env:GEMINI_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai"
+$env:DEEPSEEK_API_KEY="your-deepseek-key"
+$env:DEEPSEEK_MODEL="deepseek-chat"
+$env:DEEPSEEK_BASE_URL="https://api.deepseek.com"
 $env:AI_JURISDICTION="Bahrain"
 $env:AI_LAWS_DB_PATH="data/laws_db.json"
 ```
 
 What is implemented:
 
-- `Ask a Question` sends legal Q&A prompts to Gemini.
+- `Ask a Question` sends legal Q&A prompts to DeepSeek.
 - `Create Document` drafts first-pass legal text with placeholders.
 - `Analyze Document` reviews pasted clauses or documents for risks and gaps.
 - `Find Lawyer` reuses the existing lawyer directory and routes users to the protected workspace.
-- The backend loads `backend/data/laws_db.json` by default and sends only the most relevant Bahrain law excerpts to Gemini for each request instead of the full JSON file.
+- The backend loads `backend/data/laws_db.json` by default and sends only the most relevant Bahrain law excerpts to DeepSeek for each request instead of the full JSON file.
 
 The AI endpoint returns general legal information only. For real deployment, you should still add:
 

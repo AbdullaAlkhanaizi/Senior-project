@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var ErrNotConfigured = errors.New("gemini api key is not configured")
+var ErrNotConfigured = errors.New("deepseek api key is not configured")
 
 type Message struct {
 	Role    string `json:"role"`
@@ -93,9 +93,9 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error
 	if resp.StatusCode >= http.StatusBadRequest {
 		var apiErr chatCompletionErrorResponse
 		if err := json.Unmarshal(body, &apiErr); err == nil && strings.TrimSpace(apiErr.Error.Message) != "" {
-			return ChatResponse{}, fmt.Errorf("gemini api error: %s", apiErr.Error.Message)
+			return ChatResponse{}, fmt.Errorf("deepseek api error: %s", apiErr.Error.Message)
 		}
-		return ChatResponse{}, fmt.Errorf("gemini api error: status %d", resp.StatusCode)
+		return ChatResponse{}, fmt.Errorf("deepseek api error: status %d", resp.StatusCode)
 	}
 
 	var completion chatCompletionResponse
@@ -103,7 +103,7 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error
 		return ChatResponse{}, err
 	}
 	if len(completion.Choices) == 0 || strings.TrimSpace(completion.Choices[0].Message.Content) == "" {
-		return ChatResponse{}, errors.New("gemini returned an empty response")
+		return ChatResponse{}, errors.New("deepseek returned an empty response")
 	}
 
 	return ChatResponse{

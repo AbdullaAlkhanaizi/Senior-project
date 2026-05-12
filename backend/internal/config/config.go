@@ -6,19 +6,19 @@ import (
 )
 
 type Config struct {
-	Addr           string
-	FrontendOrigin string
-	DatabasePath   string
-	UploadDir      string
-	AuthSecret     string
-	AdminName      string
-	AdminEmail     string
-	AdminPassword  string
-	GeminiAPIKey   string
-	GeminiBaseURL  string
-	GeminiModel    string
-	AIJurisdiction string
-	AILawsDBPath   string
+	Addr            string
+	FrontendOrigin  string
+	DatabasePath    string
+	UploadDir       string
+	AuthSecret      string
+	AdminName       string
+	AdminEmail      string
+	AdminPassword   string
+	DeepSeekAPIKey  string
+	DeepSeekBaseURL string
+	DeepSeekModel   string
+	AIJurisdiction  string
+	AILawsDBPath    string
 }
 
 func Load() Config {
@@ -29,19 +29,19 @@ func Load() Config {
 	}
 
 	return Config{
-		Addr:           addr,
-		FrontendOrigin: envOrDefault("FRONTEND_ORIGIN", "http://localhost:3000"),
-		DatabasePath:   envOrDefault("DATABASE_PATH", "data/legal_consultant.db"),
-		UploadDir:      envOrDefault("UPLOAD_DIR", "uploads"),
-		AuthSecret:     envOrDefault("AUTH_SECRET", "local-dev-auth-secret"),
-		AdminName:      envOrDefault("ADMIN_NAME", "Developer Admin"),
-		AdminEmail:     envOrDefault("ADMIN_EMAIL", "admin@legal-portal.local"),
-		AdminPassword:  envOrDefault("ADMIN_PASSWORD", "ChangeMe123!"),
-		GeminiAPIKey:   strings.TrimSpace(os.Getenv("GEMINI_API_KEY")),
-		GeminiBaseURL:  envOrDefault("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai"),
-		GeminiModel:    envOrDefault("GEMINI_MODEL", "gemini-2.5-flash"),
-		AIJurisdiction: envOrDefault("AI_JURISDICTION", "Bahrain"),
-		AILawsDBPath:   envOrDefault("AI_LAWS_DB_PATH", "data/laws_db.json"),
+		Addr:            addr,
+		FrontendOrigin:  envOrDefault("FRONTEND_ORIGIN", "http://localhost:3000"),
+		DatabasePath:    envOrDefault("DATABASE_PATH", "data/legal_consultant.db"),
+		UploadDir:       envOrDefault("UPLOAD_DIR", "uploads"),
+		AuthSecret:      envOrDefault("AUTH_SECRET", "local-dev-auth-secret"),
+		AdminName:       envOrDefault("ADMIN_NAME", "Developer Admin"),
+		AdminEmail:      envOrDefault("ADMIN_EMAIL", "admin@legal-portal.local"),
+		AdminPassword:   envOrDefault("ADMIN_PASSWORD", "ChangeMe123!"),
+		DeepSeekAPIKey:  envOrDefault("DEEPSEEK_API_KEY","sk-54916279acbe4f2283f526b62ea7ef6b"),
+		DeepSeekBaseURL: envOrDefault("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+		DeepSeekModel:   envOrDefault("DEEPSEEK_MODEL", "deepseek-chat"),
+		AIJurisdiction:  envOrDefault("AI_JURISDICTION", "Bahrain"),
+		AILawsDBPath:    envOrDefault("AI_LAWS_DB_PATH", "data/laws_db.json"),
 	}
 }
 
