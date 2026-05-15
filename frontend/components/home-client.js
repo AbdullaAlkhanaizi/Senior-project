@@ -310,6 +310,7 @@ function getInitials(name = "") {
 
 export default function HomeClient() {
   const router = useRouter();
+  const [session, setSession] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
@@ -323,6 +324,7 @@ export default function HomeClient() {
       return;
     }
 
+    setSession(currentSession);
     setReady(true);
 
     async function load() {
@@ -342,6 +344,31 @@ export default function HomeClient() {
     return (
       <main className="login-home-page">
         <p className="login-home-loading">Preparing your home page...</p>
+      </main>
+    );
+  }
+
+  if (session?.role === "admin") {
+    return (
+      <main className="login-home-page">
+        {error ? <p className="feedback error">{error}</p> : null}
+        <section className="login-home-hero" aria-labelledby="admin-home-title">
+          <div className="login-home-hero-copy">
+            <h1 id="admin-home-title">Admin Dashboard</h1>
+            <p>Welcome to the platform administration panel.</p>
+            <div className="login-home-hero-actions" style={{ marginTop: '2rem' }}>
+              <Link href="/admin/lawyers/create" className="login-home-button login-home-button-primary">
+                Create Lawyer Account
+              </Link>
+              <Link href="/admin/statistics" className="login-home-button login-home-button-secondary">
+                View Statistics
+              </Link>
+              <Link href="/admin/users" className="login-home-button login-home-button-secondary">
+                Manage Users
+              </Link>
+            </div>
+          </div>
+        </section>
       </main>
     );
   }
