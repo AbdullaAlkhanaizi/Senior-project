@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createLawyerAccount } from "../lib/api";
 
 export default function AdminLawyerCreateClient() {
@@ -45,6 +46,11 @@ export default function AdminLawyerCreateClient() {
         <div className="login-home-hero-copy">
           <h1>Create Lawyer Account</h1>
           <p>Add a new legal professional to the platform.</p>
+          <div style={{ marginTop: "1.5rem" }}>
+            <Link href="/home" className="login-home-button login-home-button-secondary" style={{ minHeight: "auto", minWidth: "auto", padding: "10px 20px" }}>
+              Back to Dashboard
+            </Link>
+          </div>
         </div>
       </section>
 

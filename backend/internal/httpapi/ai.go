@@ -3,14 +3,17 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"senior-project/backend/internal/ai"
 	"senior-project/backend/internal/models"
 )
 
 const aiDisclaimer = "AI-generated legal information only. It is not a substitute for advice from a licensed lawyer reviewing your exact facts and documents."
+const aiUsageTimeLayout = "2006-01-02T15:04:05Z07:00"
 
 func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -24,10 +27,32 @@ func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	current, err := s.viewerFromRequest(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
 	mode := normalizeAIMode(req.Mode)
 	if mode == "" {
 		writeError(w, http.StatusBadRequest, "mode must be ask, create, or analyze")
 		return
+	}
+
+	if req.CaseID != 0 {
+		if current == nil || current.Role == models.RoleGuest {
+			writeError(w, http.StatusUnauthorized, "sign in to link AI usage to a case")
+			return
+		}
+		allowed, err := s.store.CanAccessCase(r.Context(), req.CaseID, current.Role, current.ID, current.LawyerID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if !allowed {
+			writeError(w, http.StatusForbidden, "you do not have access to this case")
+			return
+		}
 	}
 
 	messages, err := sanitizeAIMessages(req.Messages)
@@ -50,6 +75,23 @@ func (s *Server) handleAIChat(w http.ResponseWriter, r *http.Request) {
 		}
 		writeError(w, status, err.Error())
 		return
+	}
+
+	if logErr := s.store.CreateAIUsageLog(r.Context(), models.AIUsageLog{
+		UserID:           viewerID(current),
+		UserName:         viewerName(current),
+		UserRole:         viewerRole(current),
+		CaseID:           req.CaseID,
+		Model:            defaultString(reply.Model, s.ai.Model()),
+		Mode:             mode,
+		Category:         strings.TrimSpace(req.Category),
+		PromptTokens:     reply.Usage.PromptTokens,
+		CompletionTokens: reply.Usage.CompletionTokens,
+		TotalTokens:      reply.Usage.TotalTokens,
+		EstimatedCostUSD: estimateAICostUSD(reply.Usage, s.config.AIInputCostPerM, s.config.AIOutputCostPerM),
+		CreatedAt:        time.Now().UTC().Format(aiUsageTimeLayout),
+	}); logErr != nil {
+		log.Printf("warning: unable to write ai usage log: %v", logErr)
 	}
 
 	writeJSON(w, http.StatusOK, models.AIChatResponse{
@@ -110,17 +152,26 @@ func buildAISystemPrompt(mode, category, jurisdiction, lawsContext string) strin
 	builder.WriteString(defaultString(strings.TrimSpace(jurisdiction), "Bahrain"))
 	builder.WriteString(". ")
 
-	// 1. Force the exact output structure requiring formal titles
-	builder.WriteString("CRITICAL INSTRUCTION: You MUST answer the user's question in a single concise sentence following EXACTLY this structure:\n")
+	builder.WriteString("CRITICAL INSTRUCTION: You must first classify the user's request as either SIMPLE-DIRECT or COMPLEX-UNCERTAIN.\n")
+	builder.WriteString("A request is SIMPLE-DIRECT only if it asks a narrow legal yes/no question and the answer is directly allowed or forbidden by a clear rule you know with high confidence.\n")
+	builder.WriteString("A request is COMPLEX-UNCERTAIN if it is fact-specific, document-specific, procedural, strategic, exception-heavy, penalty-sensitive, depends on missing facts, or cannot be answered with very high confidence from a clear rule.\n\n")
+
+	builder.WriteString("If the request is SIMPLE-DIRECT, answer in exactly one sentence using this exact structure:\n")
 	builder.WriteString("[Yes/No], [briefly state what is allowed or prohibited], as per [Exact Formal Title of the Law/Decree and Article].\n\n")
 
-	// 2. Enforce formal citations for both DB hits and fallbacks
-	builder.WriteString("Strict Output Rules & Logic:\n")
-	builder.WriteString("1. Start exactly with 'Yes,' or 'No,'.\n")
-	builder.WriteString("2. First, check the BAHRAIN LAW KNOWLEDGE BASE below. If an excerpt answers the prompt, cite its exact 'Title:' field at the end.\n")
-	builder.WriteString("3. FALLBACK RULE: If the provided excerpts are irrelevant or missing, use your general foundational knowledge of Bahrain law to answer correctly. When answering from general knowledge, you MUST cite the formal statute, Legislative Decree, or specific Article (e.g., 'Legislative Decree No. 23 of 2014 Promulgating the Traffic Law, Article 50') instead of a generic title.\n")
-	builder.WriteString("4. Keep the middle explanation concise and under 15 words.\n")
-	builder.WriteString("5. Absolutely NO introductory text, disclaimers, extra paragraphs, or bullet points.\n")
+	builder.WriteString("If the request is COMPLEX-UNCERTAIN, do NOT guess, do NOT balance possibilities, and do NOT provide a partial legal conclusion.\n")
+	builder.WriteString("Instead, answer in exactly one sentence using this exact structure:\n")
+	builder.WriteString("This question requires a licensed lawyer to review your specific facts and documents before giving a reliable legal answer.\n\n")
+
+	builder.WriteString("Strict decision rules:\n")
+	builder.WriteString("1. Start by checking the BAHRAIN LAW KNOWLEDGE BASE below.\n")
+	builder.WriteString("2. Use a Yes/No legal answer only when the rule is direct, the result is clear, and you can cite the exact law title or formal statute/article with high confidence.\n")
+	builder.WriteString("3. If the knowledge base is irrelevant or incomplete, you may use general knowledge only for straightforward black-letter rules with very high confidence.\n")
+	builder.WriteString("4. If there is any meaningful uncertainty, missing fact, possible exception, or need for legal judgment, you must use the lawyer-referral sentence instead.\n")
+	builder.WriteString("5. Questions about contracts, liability, defenses, evidence, deadlines, immigration status, employment termination details, family disputes, criminal exposure, regulatory compliance, or \"what should I do\" are usually COMPLEX-UNCERTAIN.\n")
+	builder.WriteString("6. Never invent a citation. Never cite a generic law name when you are unsure of the exact formal source.\n")
+	builder.WriteString("7. Do not include introductory text, explanations about uncertainty, bullet points, multiple sentences, or disclaimers.\n")
+	builder.WriteString("8. When using the Yes/No format, keep the middle explanation concise and under 15 words.\n")
 
 	if strings.TrimSpace(lawsContext) != "" {
 		builder.WriteString("\n\n--- BAHRAIN LAW KNOWLEDGE BASE ---\n")
@@ -177,4 +228,29 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func estimateAICostUSD(usage ai.TokenUsage, inputCostPerM, outputCostPerM float64) float64 {
+	return (float64(usage.PromptTokens)/1_000_000)*inputCostPerM + (float64(usage.CompletionTokens)/1_000_000)*outputCostPerM
+}
+
+func viewerID(current *viewer) int64 {
+	if current == nil {
+		return 0
+	}
+	return current.ID
+}
+
+func viewerName(current *viewer) string {
+	if current == nil || strings.TrimSpace(current.Name) == "" {
+		return "Guest"
+	}
+	return current.Name
+}
+
+func viewerRole(current *viewer) string {
+	if current == nil || strings.TrimSpace(current.Role) == "" {
+		return models.RoleGuest
+	}
+	return current.Role
 }

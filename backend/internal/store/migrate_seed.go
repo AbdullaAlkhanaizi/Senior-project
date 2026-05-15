@@ -98,6 +98,23 @@ func (s *Store) Migrate(ctx context.Context) error {
 			FOREIGN KEY (user_id) REFERENCES users(id),
 			FOREIGN KEY (lawyer_id) REFERENCES lawyers(id)
 		);`,
+		`CREATE TABLE IF NOT EXISTS ai_usage_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER,
+			user_name TEXT NOT NULL DEFAULT '',
+			user_role TEXT NOT NULL DEFAULT 'guest',
+			case_id INTEGER,
+			model TEXT NOT NULL,
+			mode TEXT NOT NULL,
+			category TEXT NOT NULL DEFAULT '',
+			prompt_tokens INTEGER NOT NULL DEFAULT 0,
+			completion_tokens INTEGER NOT NULL DEFAULT 0,
+			total_tokens INTEGER NOT NULL DEFAULT 0,
+			estimated_cost_usd REAL NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL,
+			FOREIGN KEY (user_id) REFERENCES users(id),
+			FOREIGN KEY (case_id) REFERENCES cases(id)
+		);`,
 	}
 
 	for _, statement := range statements {
@@ -155,6 +172,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_lawyers_user_id ON lawyers(user_id) WHERE user_id IS NOT NULL;`,
 		`CREATE INDEX IF NOT EXISTS idx_cases_client_user_id ON cases(client_user_id);`,
 		`CREATE INDEX IF NOT EXISTS idx_case_events_case_id ON case_events(case_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_user_id ON ai_usage_logs(user_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_case_id ON ai_usage_logs(case_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_created_at ON ai_usage_logs(created_at);`,
 	}
 
 	for _, statement := range indexStatements {

@@ -27,6 +27,13 @@ type ChatRequest struct {
 type ChatResponse struct {
 	Model   string
 	Message Message
+	Usage   TokenUsage
+}
+
+type TokenUsage struct {
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
 }
 
 type Client struct {
@@ -109,6 +116,11 @@ func (c *Client) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error
 	return ChatResponse{
 		Model:   completion.Model,
 		Message: completion.Choices[0].Message,
+		Usage: TokenUsage{
+			PromptTokens:     completion.Usage.PromptTokens,
+			CompletionTokens: completion.Usage.CompletionTokens,
+			TotalTokens:      completion.Usage.TotalTokens,
+		},
 	}, nil
 }
 
@@ -122,6 +134,11 @@ type chatCompletionResponse struct {
 	Choices []struct {
 		Message Message `json:"message"`
 	} `json:"choices"`
+	Usage struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"usage"`
 }
 
 type chatCompletionErrorResponse struct {

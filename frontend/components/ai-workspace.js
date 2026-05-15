@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { askLegalAssistant } from "../lib/api";
+import { askLegalAssistant, getDashboard } from "../lib/api";
 
 // --- ICONS ---
 const LightbulbIcon = () => (
@@ -104,8 +104,32 @@ export default function AIWorkspace() {
   const [messages, setMessages] = useState(() => [buildWelcomeMessage(false)]);
   const [disclaimer, setDisclaimer] = useState("");
   const [activeModel, setActiveModel] = useState("");
+  const [activeCaseId, setActiveCaseId] = useState(0);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCaseContext() {
+      try {
+        const dashboard = await getDashboard();
+        if (isMounted) {
+          setActiveCaseId(dashboard?.activeCase?.case?.id || 0);
+        }
+      } catch {
+        if (isMounted) {
+          setActiveCaseId(0);
+        }
+      }
+    }
+
+    loadCaseContext();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   async function handleSend(event) {
     event.preventDefault();
@@ -135,6 +159,7 @@ export default function AIWorkspace() {
       const response = await askLegalAssistant({
         mode: "ask",
         category: issueCategory,
+        caseId: activeCaseId || undefined,
         messages: buildChatPayload(nextMessages)
       });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { getAdminUsers } from "../lib/api";
 
 export default function AdminUsersClient() {
@@ -28,6 +29,11 @@ export default function AdminUsersClient() {
         <div className="login-home-hero-copy">
           <h1>User Management</h1>
           <p>Manage clients and lawyers on the platform.</p>
+          <div style={{ marginTop: "1.5rem" }}>
+            <Link href="/home" className="login-home-button login-home-button-secondary" style={{ minHeight: "auto", minWidth: "auto", padding: "10px 20px" }}>
+              Back to Dashboard
+            </Link>
+          </div>
         </div>
       </section>
 

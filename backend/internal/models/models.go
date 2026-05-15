@@ -8,8 +8,8 @@ const (
 )
 
 type DashboardResponse struct {
-	Lawyers        []Lawyer        `json:"lawyers"`
-	ActiveCase     *CaseDetails    `json:"activeCase,omitempty"`
+	Lawyers    []Lawyer     `json:"lawyers"`
+	ActiveCase *CaseDetails `json:"activeCase,omitempty"`
 }
 
 type Lawyer struct {
@@ -139,6 +139,7 @@ type AIChatMessage struct {
 type AIChatRequest struct {
 	Mode     string          `json:"mode"`
 	Category string          `json:"category"`
+	CaseID   int64           `json:"caseId,omitempty"`
 	Messages []AIChatMessage `json:"messages"`
 }
 
@@ -147,6 +148,21 @@ type AIChatResponse struct {
 	Model            string        `json:"model"`
 	Disclaimer       string        `json:"disclaimer"`
 	SuggestedActions []string      `json:"suggestedActions"`
+}
+
+type AIUsageLog struct {
+	UserID           int64   `json:"userId,omitempty"`
+	UserName         string  `json:"userName"`
+	UserRole         string  `json:"userRole"`
+	CaseID           int64   `json:"caseId,omitempty"`
+	Model            string  `json:"model"`
+	Mode             string  `json:"mode"`
+	Category         string  `json:"category"`
+	PromptTokens     int     `json:"promptTokens"`
+	CompletionTokens int     `json:"completionTokens"`
+	TotalTokens      int     `json:"totalTokens"`
+	EstimatedCostUSD float64 `json:"estimatedCostUsd"`
+	CreatedAt        string  `json:"createdAt"`
 }
 
 type Review struct {
@@ -177,6 +193,42 @@ type LawyerCompletedStats struct {
 	NotDecided     int    `json:"notDecided"`
 }
 
+type AIUsageSummary struct {
+	TotalRequests         int     `json:"totalRequests"`
+	CaseLinkedRequests    int     `json:"caseLinkedRequests"`
+	TrackedUsers          int     `json:"trackedUsers"`
+	PromptTokens          int     `json:"promptTokens"`
+	CompletionTokens      int     `json:"completionTokens"`
+	TotalTokens           int     `json:"totalTokens"`
+	EstimatedCostUSD      float64 `json:"estimatedCostUsd"`
+	AverageCostPerRequest float64 `json:"averageCostPerRequest"`
+}
+
+type AIUsageByUserStats struct {
+	UserID           int64   `json:"userId,omitempty"`
+	UserName         string  `json:"userName"`
+	UserRole         string  `json:"userRole"`
+	RequestCount     int     `json:"requestCount"`
+	PromptTokens     int     `json:"promptTokens"`
+	CompletionTokens int     `json:"completionTokens"`
+	TotalTokens      int     `json:"totalTokens"`
+	EstimatedCostUSD float64 `json:"estimatedCostUsd"`
+	LastUsedAt       string  `json:"lastUsedAt"`
+}
+
+type AIUsageByCaseStats struct {
+	CaseID           int64   `json:"caseId"`
+	CaseTitle        string  `json:"caseTitle"`
+	ClientName       string  `json:"clientName"`
+	LawyerName       string  `json:"lawyerName"`
+	RequestCount     int     `json:"requestCount"`
+	PromptTokens     int     `json:"promptTokens"`
+	CompletionTokens int     `json:"completionTokens"`
+	TotalTokens      int     `json:"totalTokens"`
+	EstimatedCostUSD float64 `json:"estimatedCostUsd"`
+	LastUsedAt       string  `json:"lastUsedAt"`
+}
+
 type AdminStatsResponse struct {
 	TotalUsers     int                    `json:"totalUsers"`
 	TotalLawyers   int                    `json:"totalLawyers"`
@@ -184,6 +236,9 @@ type AdminStatsResponse struct {
 	ActiveCases    int                    `json:"activeCases"`
 	CompletedCases int                    `json:"completedCases"`
 	LawyerStats    []LawyerCompletedStats `json:"lawyerStats"`
+	AIUsage        AIUsageSummary         `json:"aiUsage"`
+	AIUsageByUser  []AIUsageByUserStats   `json:"aiUsageByUser"`
+	AIUsageByCase  []AIUsageByCaseStats   `json:"aiUsageByCase"`
 }
 
 type AdminUser struct {
@@ -193,4 +248,3 @@ type AdminUser struct {
 	Role      string `json:"role"`
 	CreatedAt string `json:"createdAt"`
 }
-
