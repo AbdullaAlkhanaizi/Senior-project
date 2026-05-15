@@ -184,6 +184,15 @@ export async function reorderCaseSteps(caseId, updateIds) {
   return parseJSON(response);
 }
 
+export async function updateCaseVisibility(caseId, hidden) {
+  const response = await fetch(`${API_BASE}/api/cases/${caseId}/visibility`, {
+    method: "POST",
+    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ hidden })
+  });
+  return parseJSON(response);
+}
+
 export async function getReviews() {
   const response = await fetch(`${API_BASE}/api/reviews`, {
     cache: "no-store",

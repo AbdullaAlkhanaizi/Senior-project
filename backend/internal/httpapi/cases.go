@@ -57,8 +57,8 @@ func (s *Server) handleCases(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid json body")
 			return
 		}
-		if strings.TrimSpace(req.Summary) == "" || req.LawyerID == 0 {
-			writeError(w, http.StatusBadRequest, "lawyerId and issue summary are required")
+		if strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Summary) == "" || req.LawyerID == 0 {
+			writeError(w, http.StatusBadRequest, "lawyerId, case title, and issue summary are required")
 			return
 		}
 
@@ -70,6 +70,8 @@ func (s *Server) handleCases(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		s.broadcastCaseListRefresh(models.RoleLawyer, 0, req.LawyerID)
+		s.broadcastCaseListRefresh(models.RoleClient, current.ID, 0)
 		writeJSON(w, http.StatusCreated, details)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -263,7 +265,8 @@ func (s *Server) handleCaseDecision(w http.ResponseWriter, r *http.Request, case
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-
+	s.broadcastCaseListRefresh(models.RoleLawyer, 0, current.LawyerID)
+	s.broadcastCaseListRefresh(models.RoleClient, details.Case.ClientUserID, 0)
 	writeJSON(w, http.StatusOK, details)
 }
 

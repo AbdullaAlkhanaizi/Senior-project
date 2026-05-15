@@ -36,6 +36,8 @@ type CaseSummary struct {
 	ClientUserID    int64  `json:"clientUserId,omitempty"`
 	LawyerID        int64  `json:"lawyerId"`
 	LawyerName      string `json:"lawyerName"`
+	HiddenByClient  bool   `json:"hiddenByClient"`
+	HiddenByLawyer  bool   `json:"hiddenByLawyer"`
 	CreatedAt       string `json:"createdAt"`
 	RespondedAt     string `json:"respondedAt,omitempty"`
 }
@@ -87,6 +89,10 @@ type UpsertCaseUpdateRequest struct {
 
 type ReorderCaseUpdatesRequest struct {
 	UpdateIDs []int64 `json:"updateIds"`
+}
+
+type UpdateCaseVisibilityRequest struct {
+	Hidden bool `json:"hidden"`
 }
 
 type CreateMessageRequest struct {

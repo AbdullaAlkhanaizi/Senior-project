@@ -51,6 +51,8 @@ func (s *Store) Migrate(ctx context.Context) error {
 			client_name TEXT NOT NULL,
 			client_user_id INTEGER,
 			lawyer_id INTEGER NOT NULL,
+			hidden_by_client INTEGER NOT NULL DEFAULT 0,
+			hidden_by_lawyer INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL,
 			responded_at TEXT NOT NULL DEFAULT '',
 			FOREIGN KEY (client_user_id) REFERENCES users(id),
@@ -147,6 +149,12 @@ func (s *Store) Migrate(ctx context.Context) error {
 	if err := s.ensureColumn(ctx, "cases", "outcome", "TEXT NOT NULL DEFAULT 'Not decided'"); err != nil {
 		return err
 	}
+	if err := s.ensureColumn(ctx, "cases", "hidden_by_client", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn(ctx, "cases", "hidden_by_lawyer", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+		return err
+	}
 
 	// Temporarily reset all existing outcomes as requested by the user
 	_, _ = s.db.ExecContext(ctx, "UPDATE cases SET outcome = 'Not decided'")
@@ -165,6 +173,22 @@ func (s *Store) Migrate(ctx context.Context) error {
 		UPDATE cases
 		SET responded_at = created_at
 		WHERE decision_status IN ('accepted', 'declined') AND TRIM(COALESCE(responded_at, '')) = ''`); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `
+		UPDATE cases
+		SET status = 'Declined', progress_percent = 100
+		WHERE decision_status = 'declined'`); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `
+		UPDATE case_updates
+		SET state = 'completed'
+		WHERE case_id IN (
+			SELECT id
+			FROM cases
+			WHERE decision_status = 'declined'
+		)`); err != nil {
 		return err
 	}
 

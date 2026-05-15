@@ -49,7 +49,9 @@ func (s *Store) ListCases(ctx context.Context) ([]models.CaseSummary, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT c.id, c.title, c.summary, c.status, c.decision_status, c.decision_note,
 		       COALESCE(u.completed_tasks, 0), COALESCE(u.total_tasks, 0),
-		       c.client_name, COALESCE(c.client_user_id, 0), c.lawyer_id, l.name, c.created_at, COALESCE(c.responded_at, '')
+		       c.client_name, COALESCE(c.client_user_id, 0), c.lawyer_id, l.name,
+		       COALESCE(c.hidden_by_client, 0), COALESCE(c.hidden_by_lawyer, 0),
+		       c.created_at, COALESCE(c.responded_at, '')
 		FROM cases c
 		JOIN lawyers l ON l.id = c.lawyer_id
 		LEFT JOIN (
@@ -70,6 +72,8 @@ func (s *Store) ListCases(ctx context.Context) ([]models.CaseSummary, error) {
 		var item models.CaseSummary
 		var completedTasks int
 		var totalTasks int
+		var hiddenByClient int
+		var hiddenByLawyer int
 		if err := rows.Scan(
 			&item.ID,
 			&item.Title,
@@ -83,12 +87,16 @@ func (s *Store) ListCases(ctx context.Context) ([]models.CaseSummary, error) {
 			&item.ClientUserID,
 			&item.LawyerID,
 			&item.LawyerName,
+			&hiddenByClient,
+			&hiddenByLawyer,
 			&item.CreatedAt,
 			&item.RespondedAt,
 		); err != nil {
 			return nil, err
 		}
 		item.ProgressPercent = calculateProgressPercent(completedTasks, totalTasks)
+		item.HiddenByClient = hiddenByClient == 1
+		item.HiddenByLawyer = hiddenByLawyer == 1
 		items = append(items, item)
 	}
 
@@ -97,10 +105,14 @@ func (s *Store) ListCases(ctx context.Context) ([]models.CaseSummary, error) {
 
 func (s *Store) LoadCaseDetails(ctx context.Context, caseID int64) (models.CaseDetails, error) {
 	var details models.CaseDetails
+	var hiddenByClient int
+	var hiddenByLawyer int
 
 	err := s.db.QueryRowContext(ctx, `
 		SELECT c.id, c.title, c.summary, c.status, c.decision_status, c.decision_note,
-		       c.client_name, COALESCE(c.client_user_id, 0), c.lawyer_id, c.created_at, COALESCE(c.responded_at, ''),
+		       c.client_name, COALESCE(c.client_user_id, 0), c.lawyer_id,
+		       COALESCE(c.hidden_by_client, 0), COALESCE(c.hidden_by_lawyer, 0),
+		       c.created_at, COALESCE(c.responded_at, ''),
 		       l.id, COALESCE(l.user_id, 0), l.name, l.firm, l.specialty, l.city, l.email, l.phone, l.bio
 		FROM cases c
 		JOIN lawyers l ON l.id = c.lawyer_id
@@ -114,6 +126,8 @@ func (s *Store) LoadCaseDetails(ctx context.Context, caseID int64) (models.CaseD
 		&details.Case.ClientName,
 		&details.Case.ClientUserID,
 		&details.Case.LawyerID,
+		&hiddenByClient,
+		&hiddenByLawyer,
 		&details.Case.CreatedAt,
 		&details.Case.RespondedAt,
 		&details.Lawyer.ID,
@@ -129,6 +143,8 @@ func (s *Store) LoadCaseDetails(ctx context.Context, caseID int64) (models.CaseD
 	if err != nil {
 		return models.CaseDetails{}, err
 	}
+	details.Case.HiddenByClient = hiddenByClient == 1
+	details.Case.HiddenByLawyer = hiddenByLawyer == 1
 	details.Case.LawyerName = details.Lawyer.Name
 
 	updateRows, err := s.db.QueryContext(ctx, `
@@ -261,6 +277,54 @@ func (s *Store) CanAccessCase(ctx context.Context, caseID int64, role string, us
 	return count > 0, nil
 }
 
+func (s *Store) UpdateCaseVisibility(ctx context.Context, caseID int64, role string, userID, lawyerID int64, hidden bool) (models.CaseDetails, error) {
+	if role != models.RoleClient && role != models.RoleLawyer {
+		return models.CaseDetails{}, errors.New("only clients and lawyers can update case visibility")
+	}
+
+	var decisionStatus string
+	var canAccess int
+	query := `
+		SELECT decision_status, COUNT(*)
+		FROM cases
+		WHERE id = ?`
+	args := []any{caseID}
+
+	if role == models.RoleLawyer {
+		query += ` AND lawyer_id = ?`
+		args = append(args, lawyerID)
+	} else {
+		query += ` AND client_user_id = ?`
+		args = append(args, userID)
+	}
+
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(&decisionStatus, &canAccess); err != nil {
+		return models.CaseDetails{}, err
+	}
+	if canAccess == 0 {
+		return models.CaseDetails{}, sql.ErrNoRows
+	}
+	if decisionStatus != "completed" && decisionStatus != "declined" {
+		return models.CaseDetails{}, errors.New("only completed or declined cases can be hidden")
+	}
+
+	column := "hidden_by_client"
+	if role == models.RoleLawyer {
+		column = "hidden_by_lawyer"
+	}
+
+	if _, err := s.db.ExecContext(ctx, `
+		UPDATE cases
+		SET `+column+` = ?
+		WHERE id = ?`,
+		boolToInt(hidden), caseID,
+	); err != nil {
+		return models.CaseDetails{}, err
+	}
+
+	return s.LoadCaseDetails(ctx, caseID)
+}
+
 func (s *Store) CaseAllowsMessaging(ctx context.Context, caseID int64) (bool, string, error) {
 	var decisionStatus string
 	err := s.db.QueryRowContext(ctx, `
@@ -286,8 +350,11 @@ func (s *Store) CreateCase(ctx context.Context, req models.CreateCaseRequest) (m
 	defer tx.Rollback()
 
 	now := time.Now().UTC().Format(timeLayout)
-	title := buildCaseTitle(req.Title, req.Summary)
+	title := strings.TrimSpace(req.Title)
 	summary := strings.TrimSpace(req.Summary)
+	if title == "" {
+		return models.CaseDetails{}, errors.New("case title is required")
+	}
 	if summary == "" {
 		return models.CaseDetails{}, errors.New("issue description is required")
 	}
@@ -363,7 +430,7 @@ func (s *Store) DecideCase(ctx context.Context, caseID int64, actorName string, 
 	if err != nil {
 		return models.CaseDetails{}, err
 	}
-	
+
 	if decision != "completed" && currentDecision != "pending" {
 		return models.CaseDetails{}, fmt.Errorf("case is already %s", currentDecision)
 	}
@@ -376,7 +443,7 @@ func (s *Store) DecideCase(ctx context.Context, caseID int64, actorName string, 
 	systemBody := fmt.Sprintf("%s accepted the case.", actorName)
 	outcome := "Not decided"
 	if decision == "declined" {
-		status = "Declined by lawyer"
+		status = "Declined"
 		systemBody = fmt.Sprintf("%s declined the case.", actorName)
 	} else if decision == "completed" {
 		status = "Case completed"
@@ -698,7 +765,7 @@ func buildCaseTimeline(decisionStatus string) []caseTimelineStep {
 		return []caseTimelineStep{
 			{Label: "Case request submitted", State: "completed", Order: 1},
 			{Label: "Lawyer declined", State: "completed", Order: 2},
-			{Label: "Choose another lawyer", State: "current", Order: 3},
+			{Label: "Case closed", State: "completed", Order: 3},
 		}
 	default:
 		return []caseTimelineStep{
@@ -814,6 +881,13 @@ func isValidCaseUpdateState(state string) bool {
 	default:
 		return false
 	}
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func buildCaseTitle(title, summary string) string {

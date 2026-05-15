@@ -15,6 +15,7 @@ import {
   getReviews,
   reorderCaseSteps,
   sendCaseMessage,
+  updateCaseVisibility,
   updateCaseStep,
   uploadCaseAttachment
 } from "../lib/api";
@@ -80,6 +81,7 @@ export default function MessagingClient() {
   const [activeCase, setActiveCase] = useState(null);
   const [selectedCaseId, setSelectedCaseId] = useState(null);
   const [selectedLawyerId, setSelectedLawyerId] = useState(0);
+  const [caseTitle, setCaseTitle] = useState("");
   const [issueSummary, setIssueSummary] = useState("");
   const [messageInput, setMessageInput] = useState("");
   const [decisionNote, setDecisionNote] = useState("");
@@ -94,6 +96,13 @@ export default function MessagingClient() {
   const [showCreateCaseForm, setShowCreateCaseForm] = useState(false);
   const [showEndCaseForm, setShowEndCaseForm] = useState(false);
   const [caseOutcome, setCaseOutcome] = useState("");
+  const [showHiddenCompletedCases, setShowHiddenCompletedCases] = useState(false);
+
+  const role = session?.role || "guest";
+  const isAdmin = role === "admin";
+  const isGuest = role === "guest";
+  const isClient = role === "client";
+  const isLawyer = role === "lawyer";
 
   useEffect(() => {
     const timerId = setTimeout(() => {
@@ -206,11 +215,50 @@ export default function MessagingClient() {
     };
   }, [activeCase?.case?.id, session?.token, currentSenderType]);
 
-  const role = session?.role || "guest";
-  const isAdmin = role === "admin";
-  const isGuest = role === "guest";
-  const isClient = role === "client";
-  const isLawyer = role === "lawyer";
+  useEffect(() => {
+    let ws;
+    let reconnectTimer;
+
+    function connect() {
+      if (!session?.token || (role !== "lawyer" && role !== "client")) {
+        return;
+      }
+
+      const wsUrl = new URL(`${API_BASE}/api/cases/live`, window.location.href);
+      wsUrl.protocol = wsUrl.protocol.replace("http", "ws");
+      wsUrl.searchParams.set("token", session.token);
+
+      ws = new WebSocket(wsUrl.toString());
+
+      ws.onmessage = async (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type !== "cases:refresh") {
+            return;
+          }
+
+          await refreshCases(activeCase?.case?.id || selectedCaseId);
+        } catch (err) {
+          console.error("Case list WS parsing error:", err);
+        }
+      };
+
+      ws.onclose = () => {
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+    }
+
+    connect();
+
+    return () => {
+      clearTimeout(reconnectTimer);
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
+    };
+  }, [session?.token, role, activeCase?.case?.id, selectedCaseId]);
+
   const selectedLawyer = lawyers.find((lawyer) => lawyer.id === Number(selectedLawyerId));
   const canMessage = activeCase?.case?.decisionStatus === "accepted" && !isGuest;
   const isExpandedWorkspace =
@@ -235,14 +283,28 @@ export default function MessagingClient() {
   }, [lawyers, reviews]);
 
   const sortedCases = useMemo(() => {
-    return [...cases].sort((a, b) => {
-      const aIsCompleted = a.decisionStatus === "completed";
-      const bIsCompleted = b.decisionStatus === "completed";
+    const visibleCases = cases.filter((item) => {
+      const isCompletedLike = item.decisionStatus === "completed" || item.decisionStatus === "declined";
+      const isHidden = isLawyer ? item.hiddenByLawyer : item.hiddenByClient;
+      if (!showHiddenCompletedCases && isCompletedLike && isHidden) {
+        return false;
+      }
+      return true;
+    });
+
+    return [...visibleCases].sort((a, b) => {
+      const aIsCompleted = a.decisionStatus === "completed" || a.decisionStatus === "declined";
+      const bIsCompleted = b.decisionStatus === "completed" || b.decisionStatus === "declined";
       if (aIsCompleted && !bIsCompleted) return 1;
       if (!aIsCompleted && bIsCompleted) return -1;
       return 0;
     });
-  }, [cases]);
+  }, [cases, isLawyer, showHiddenCompletedCases]);
+
+  const activeCaseCanToggleVisibility =
+    (isLawyer || isClient) &&
+    (activeCase?.case?.decisionStatus === "completed" || activeCase?.case?.decisionStatus === "declined");
+  const activeCaseIsHidden = isLawyer ? activeCase?.case?.hiddenByLawyer : activeCase?.case?.hiddenByClient;
 
   function formatTimestamp(value) {
     return new Date(value).toLocaleString([], {
@@ -553,16 +615,22 @@ export default function MessagingClient() {
       setError("Only signed-in client accounts can create case requests.");
       return;
     }
+    if (!caseTitle.trim() || !issueSummary.trim()) {
+      setError("Case name and description are required.");
+      return;
+    }
 
     setError("");
     setStatus("Sending case request...");
 
     try {
       const data = await createCase({
+        title: caseTitle,
         summary: issueSummary,
         lawyerId: Number(selectedLawyerId)
       });
-
+      
+      setCaseTitle("");
       setIssueSummary("");
       setSelectedCaseId(data.case.id);
       setActiveCase(data);
@@ -1081,6 +1149,11 @@ export default function MessagingClient() {
                       <div className="new-case-textarea-top">
                         <h3>State your case...</h3>
                       </div>
+                      <input
+                        value={caseTitle}
+                        onChange={(event) => setCaseTitle(event.target.value)}
+                        placeholder="Case name"
+                      />
                       <textarea
                         value={issueSummary}
                         onChange={(event) => setIssueSummary(event.target.value)}
@@ -1430,40 +1503,72 @@ export default function MessagingClient() {
               <p className="panel-kicker">{isLawyer ? "Case inbox" : isClient ? "Your cases" : "Request a lawyer"}</p>
               <h2>{isLawyer ? "Assigned case requests" : isClient ? "Open a case or start a new request" : "Choose a lawyer and describe the issue"}</h2>
             </div>
+            {(isLawyer || isClient) ? (
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={() => setShowHiddenCompletedCases((current) => !current)}
+              >
+                {showHiddenCompletedCases ? "Hide hidden cases" : "Show hidden cases"}
+              </button>
+            ) : null}
           </div>
+          {(isLawyer || isClient) ? (
+            <p className="muted" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
+              Completed or declined cases can be hidden from this list. Use "Show hidden cases" to bring them back.
+            </p>
+          ) : null}
 
           <div className="case-list">
             {loadingCases ? (
               <p className="muted">Loading cases...</p>
             ) : sortedCases.length > 0 ? (
               sortedCases.map((item) => (
-                <button
+                <div
                   key={item.id}
-                  type="button"
                   className={`case-list-item ${selectedCaseId === item.id ? "selected" : ""}`}
-                  style={item.decisionStatus === "completed" ? { border: "2px solid #4CAF50" } : undefined}
-                  onClick={() => handleSelectCase(item.id)}
+                  style={(item.decisionStatus === "completed" || item.decisionStatus === "declined") ? { border: "2px solid #4CAF50" } : undefined}
                 >
-                  <div className="case-list-top">
-                    <strong>{item.title}</strong>
+                  <button
+                    type="button"
+                    style={{ all: "unset", display: "block", width: "100%", cursor: "pointer" }}
+                    onClick={() => handleSelectCase(item.id)}
+                  >
+                    <div className="case-list-top">
+                      <strong>{item.title}</strong>
+                      {isClient ? (
+                        <strong>{item.progressPercent}%</strong>
+                      ) : (
+                        <span className={`mini-status ${item.decisionStatus}`}>{item.decisionStatus}</span>
+                      )}
+                    </div>
+                    <p>{isLawyer ? item.clientName : item.lawyerName}</p>
                     {isClient ? (
-                      <strong>{item.progressPercent}%</strong>
+                      <>
+                        <div className="case-list-progress-bar">
+                          <div style={{ width: `${item.progressPercent}%` }} />
+                        </div>
+                        <small>{item.status}</small>
+                      </>
                     ) : (
-                      <span className={`mini-status ${item.decisionStatus}`}>{item.decisionStatus}</span>
-                    )}
-                  </div>
-                  <p>{isLawyer ? item.clientName : item.lawyerName}</p>
-                  {isClient ? (
-                    <>
-                      <div className="case-list-progress-bar">
-                        <div style={{ width: `${item.progressPercent}%` }} />
-                      </div>
                       <small>{item.status}</small>
-                    </>
-                  ) : (
-                    <small>{item.status}</small>
-                  )}
-                </button>
+                    )}
+                  </button>
+                  {(item.decisionStatus === "completed" || item.decisionStatus === "declined") && (isLawyer || isClient) ? (
+                    <div style={{ marginTop: "0.75rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
+                      <small style={{ color: "#6b7280" }}>
+                        {(isLawyer ? item.hiddenByLawyer : item.hiddenByClient) ? "Hidden from your default list" : "Visible in your default list"}
+                      </small>
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        onClick={() => handleCaseVisibilityToggle(item, isLawyer ? !item.hiddenByLawyer : !item.hiddenByClient)}
+                      >
+                        {(isLawyer ? item.hiddenByLawyer : item.hiddenByClient) ? "Show case" : "Hide case"}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               ))
             ) : (
               <p className="muted">No cases yet.</p>
@@ -1515,6 +1620,11 @@ export default function MessagingClient() {
                   ) : null}
 
                   <form className="referral-form" onSubmit={handleCaseCreate}>
+                    <input
+                      value={caseTitle}
+                      onChange={(event) => setCaseTitle(event.target.value)}
+                      placeholder="Case name"
+                    />
                     <textarea
                       value={issueSummary}
                       onChange={(event) => setIssueSummary(event.target.value)}
@@ -1557,6 +1667,15 @@ export default function MessagingClient() {
               <h2>{activeCase ? caseLabel : "Messaging and case progress"}</h2>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              {activeCaseCanToggleVisibility ? (
+                <button
+                  type="button"
+                  className="button-secondary panel-back-button"
+                  onClick={() => handleCaseVisibilityToggle(activeCase.case, !activeCaseIsHidden)}
+                >
+                  {activeCaseIsHidden ? "Show case" : "Hide case"}
+                </button>
+              ) : null}
               {isLawyer && activeCase?.case?.decisionStatus === "accepted" ? (
                 <button
                   type="button"
