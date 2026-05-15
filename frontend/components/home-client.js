@@ -324,14 +324,25 @@ export default function HomeClient() {
       return;
     }
 
+    if (currentSession.role === "admin") {
+      router.replace("/admin/statistics");
+      return;
+    }
+
     setSession(currentSession);
     setReady(true);
 
     async function load() {
       try {
-        const [dashData, revData] = await Promise.all([getDashboard(), getReviews()]);
+        const dashData = await getDashboard();
         setDashboard(dashData);
-        setFeaturedReviews((revData || []).slice(0, 3));
+
+        if (currentSession.role !== "admin") {
+          const revData = await getReviews();
+          setFeaturedReviews((revData || []).slice(0, 3));
+        } else {
+          setFeaturedReviews([]);
+        }
       } catch (requestError) {
         setError(requestError.message);
       }
@@ -344,31 +355,6 @@ export default function HomeClient() {
     return (
       <main className="login-home-page">
         <p className="login-home-loading">Preparing your home page...</p>
-      </main>
-    );
-  }
-
-  if (session?.role === "admin") {
-    return (
-      <main className="login-home-page">
-        {error ? <p className="feedback error">{error}</p> : null}
-        <section className="login-home-hero" aria-labelledby="admin-home-title">
-          <div className="login-home-hero-copy">
-            <h1 id="admin-home-title">Admin Dashboard</h1>
-            <p>Welcome to the platform administration panel.</p>
-            <div className="login-home-hero-actions" style={{ marginTop: '2rem' }}>
-              <Link href="/admin/lawyers/create" className="login-home-button login-home-button-primary">
-                Create Lawyer Account
-              </Link>
-              <Link href="/admin/statistics" className="login-home-button login-home-button-secondary">
-                View Statistics
-              </Link>
-              <Link href="/admin/users" className="login-home-button login-home-button-secondary">
-                Manage Users
-              </Link>
-            </div>
-          </div>
-        </section>
       </main>
     );
   }

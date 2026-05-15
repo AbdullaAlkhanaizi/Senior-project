@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { getAdminUsers } from "../lib/api";
 
 export default function AdminUsersClient() {
@@ -25,19 +24,11 @@ export default function AdminUsersClient() {
 
   return (
     <main className="login-home-page">
-      <section className="login-home-hero">
-        <div className="login-home-hero-copy">
-          <h1>User Management</h1>
-          <p>Manage clients and lawyers on the platform.</p>
-          <div style={{ marginTop: "1.5rem" }}>
-            <Link href="/home" className="login-home-button login-home-button-secondary" style={{ minHeight: "auto", minWidth: "auto", padding: "10px 20px" }}>
-              Back to Dashboard
-            </Link>
-          </div>
-        </div>
-      </section>
-
       <section className="login-home-action-section">
+        <div style={{ maxWidth: "1000px", margin: "0 auto 2rem auto" }}>
+          <h1 style={{ margin: 0 }}>User Management</h1>
+          <p style={{ margin: "0.75rem 0 0 0", color: "#6b7280" }}>Manage clients and lawyers on the platform.</p>
+        </div>
         {error ? <p className="feedback error">{error}</p> : null}
         
         {loading ? (

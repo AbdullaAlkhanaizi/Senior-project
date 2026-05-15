@@ -152,9 +152,10 @@ func buildAISystemPrompt(mode, category, jurisdiction, lawsContext string) strin
 	builder.WriteString(defaultString(strings.TrimSpace(jurisdiction), "Bahrain"))
 	builder.WriteString(". ")
 
-	builder.WriteString("CRITICAL INSTRUCTION: You must first classify the user's request as either SIMPLE-DIRECT or COMPLEX-UNCERTAIN.\n")
+	builder.WriteString("CRITICAL INSTRUCTION: You must first classify the user's request as either SIMPLE-DIRECT, COMPLEX-UNCERTAIN, or NON-LEGAL.\n")
 	builder.WriteString("A request is SIMPLE-DIRECT only if it asks a narrow legal yes/no question and the answer is directly allowed or forbidden by a clear rule you know with high confidence.\n")
 	builder.WriteString("A request is COMPLEX-UNCERTAIN if it is fact-specific, document-specific, procedural, strategic, exception-heavy, penalty-sensitive, depends on missing facts, or cannot be answered with very high confidence from a clear rule.\n\n")
+	builder.WriteString("A request is NON-LEGAL if it is unrelated to laws, legal rights, legal duties, legal procedures, legal documents, legal disputes, or legal risk.\n\n")
 
 	builder.WriteString("If the request is SIMPLE-DIRECT, answer in exactly one sentence using this exact structure:\n")
 	builder.WriteString("[Yes/No], [briefly state what is allowed or prohibited], as per [Exact Formal Title of the Law/Decree and Article].\n\n")
@@ -163,15 +164,19 @@ func buildAISystemPrompt(mode, category, jurisdiction, lawsContext string) strin
 	builder.WriteString("Instead, answer in exactly one sentence using this exact structure:\n")
 	builder.WriteString("This question requires a licensed lawyer to review your specific facts and documents before giving a reliable legal answer.\n\n")
 
+	builder.WriteString("If the request is NON-LEGAL, answer in exactly one sentence using this exact structure:\n")
+	builder.WriteString("I can only help with legal questions, so I cannot answer that request.\n\n")
+
 	builder.WriteString("Strict decision rules:\n")
 	builder.WriteString("1. Start by checking the BAHRAIN LAW KNOWLEDGE BASE below.\n")
 	builder.WriteString("2. Use a Yes/No legal answer only when the rule is direct, the result is clear, and you can cite the exact law title or formal statute/article with high confidence.\n")
 	builder.WriteString("3. If the knowledge base is irrelevant or incomplete, you may use general knowledge only for straightforward black-letter rules with very high confidence.\n")
-	builder.WriteString("4. If there is any meaningful uncertainty, missing fact, possible exception, or need for legal judgment, you must use the lawyer-referral sentence instead.\n")
-	builder.WriteString("5. Questions about contracts, liability, defenses, evidence, deadlines, immigration status, employment termination details, family disputes, criminal exposure, regulatory compliance, or \"what should I do\" are usually COMPLEX-UNCERTAIN.\n")
-	builder.WriteString("6. Never invent a citation. Never cite a generic law name when you are unsure of the exact formal source.\n")
-	builder.WriteString("7. Do not include introductory text, explanations about uncertainty, bullet points, multiple sentences, or disclaimers.\n")
-	builder.WriteString("8. When using the Yes/No format, keep the middle explanation concise and under 15 words.\n")
+	builder.WriteString("4. If the user asks for coding help, math help, writing help, general knowledge, personal advice, business advice, or any other non-legal task, you must use the NON-LEGAL sentence instead of referring them to a lawyer.\n")
+	builder.WriteString("5. If there is any meaningful uncertainty, missing fact, possible exception, or need for legal judgment, you must use the lawyer-referral sentence instead.\n")
+	builder.WriteString("6. Questions about contracts, liability, defenses, evidence, deadlines, immigration status, employment termination details, family disputes, criminal exposure, regulatory compliance, or \"what should I do\" are usually COMPLEX-UNCERTAIN.\n")
+	builder.WriteString("7. Never invent a citation. Never cite a generic law name when you are unsure of the exact formal source.\n")
+	builder.WriteString("8. Do not include introductory text, explanations about uncertainty, bullet points, multiple sentences, or disclaimers.\n")
+	builder.WriteString("9. When using the Yes/No format, keep the middle explanation concise and under 15 words.\n")
 
 	if strings.TrimSpace(lawsContext) != "" {
 		builder.WriteString("\n\n--- BAHRAIN LAW KNOWLEDGE BASE ---\n")

@@ -45,8 +45,11 @@ export default function PortalShell({ title, description, hideHero, showEyebrow 
   };
 
   const role = session?.role || "guest";
+  const isAdmin = role === "admin";
   const showMessaging = role !== "admin";
   const isGuest = !session?.token;
+  const homeHref = isAdmin ? "/admin/statistics" : "/home";
+  const homeActive = pathname === "/home" || (isAdmin && pathname === "/admin/statistics");
 
   return (
     <div className="portal-layout">
@@ -57,13 +60,23 @@ export default function PortalShell({ title, description, hideHero, showEyebrow 
           </Link>
           <div className="portal-nav-right">
             <nav className="portal-links">
-              <Link href="/home" className={pathname === "/home" ? "active" : ""}>Home</Link>
+              <Link href={homeHref} className={homeActive ? "active" : ""}>Home</Link>
               <Link href="/ai" className={pathname === "/ai" ? "active" : ""}>AI</Link>
-              <Link href="/review" className={pathname === "/review" ? "active" : ""}>Reviews</Link>
+              {isAdmin ? (
+                <Link href="/admin/lawyers/create" className={pathname === "/admin/lawyers/create" ? "active" : ""}>Create Lawyer</Link>
+              ) : null}
+              {isAdmin ? (
+                <Link href="/admin/users" className={pathname === "/admin/users" ? "active" : ""}>Users</Link>
+              ) : null}
+              {!isAdmin ? (
+                <Link href="/review" className={pathname === "/review" ? "active" : ""}>Reviews</Link>
+              ) : null}
               {showMessaging ? (
                 <Link href="/messaging" className={pathname === "/messaging" ? "active" : ""}>Messaging</Link>
               ) : null}
-              <Link href="/labor" className={pathname === "/labor" ? "active" : ""}>Labor Calculator</Link>
+              {!isAdmin ? (
+                <Link href="/labor" className={pathname === "/labor" ? "active" : ""}>Labor Calculator</Link>
+              ) : null}
             </nav>
             <div className="portal-divider"></div>
             <div className="portal-account-strip">
