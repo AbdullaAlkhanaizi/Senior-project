@@ -63,6 +63,23 @@ export async function createLawyerAccount(payload) {
   return parseJSON(response);
 }
 
+export async function getAdminStats() {
+  const response = await fetch(`${API_BASE}/api/admin/stats`, {
+    cache: "no-store",
+    headers: withAuthHeaders()
+  });
+  return parseJSON(response);
+}
+
+export async function getAdminUsers() {
+  const response = await fetch(`${API_BASE}/api/admin/users`, {
+    cache: "no-store",
+    headers: withAuthHeaders()
+  });
+  return parseJSON(response);
+}
+
+
 export async function getDashboard() {
   const response = await fetch(`${API_BASE}/api/dashboard`, {
     cache: "no-store",

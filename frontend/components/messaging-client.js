@@ -93,6 +93,7 @@ export default function MessagingClient() {
   const [lawyerView, setLawyerView] = useState("list");
   const [showCreateCaseForm, setShowCreateCaseForm] = useState(false);
   const [showEndCaseForm, setShowEndCaseForm] = useState(false);
+  const [caseOutcome, setCaseOutcome] = useState("");
 
   useEffect(() => {
     const timerId = setTimeout(() => {
@@ -574,21 +575,23 @@ export default function MessagingClient() {
     }
   }
 
-  async function handleDecision(decision) {
+  async function handleDecision(decision, outcome = "") {
     if (!activeCase?.case?.id || !isLawyer) {
       return;
     }
 
     setError("");
-    setStatus(`${decision === "accepted" ? "Accepting" : "Declining"} case...`);
+    setStatus(`${decision === "accepted" ? "Accepting" : decision === "completed" ? "Completing" : "Declining"} case...`);
 
     try {
       const details = await decideCase(activeCase.case.id, {
         decision,
-        note: decisionNote
+        note: decisionNote,
+        outcome
       });
       setActiveCase(details);
       setDecisionNote("");
+      setCaseOutcome("");
       await refreshCases(details.case.id);
       setStatus(`Case ${decision}.`);
     } catch (requestError) {
@@ -1280,18 +1283,30 @@ export default function MessagingClient() {
                   <p className="hero-copy">
                     Please provide a final note or reason for completing this case. The client will see this note, and the conversation will be locked.
                   </p>
-                  <textarea
-                    className="decision-note"
-                    value={decisionNote}
-                    onChange={(event) => setDecisionNote(event.target.value)}
-                    placeholder="Reason for ending case"
-                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem' }}>
+                    <select
+                      value={caseOutcome}
+                      onChange={(event) => setCaseOutcome(event.target.value)}
+                      style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                    >
+                      <option value="">Not decided</option>
+                      <option value="won">Won</option>
+                      <option value="lost">Lost</option>
+                    </select>
+                    <textarea
+                      className="decision-note"
+                      value={decisionNote}
+                      onChange={(event) => setDecisionNote(event.target.value)}
+                      placeholder="Reason for ending case"
+                      style={{ margin: 0 }}
+                    />
+                  </div>
                   <div className="decision-actions">
                     <button
                       type="button"
                       onClick={() => {
                         setShowEndCaseForm(false);
-                        handleDecision("completed");
+                        handleDecision("completed", caseOutcome);
                       }}
                     >
                       Complete case

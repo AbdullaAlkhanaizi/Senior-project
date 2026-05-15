@@ -374,12 +374,16 @@ func (s *Store) DecideCase(ctx context.Context, caseID int64, actorName string, 
 	now := time.Now().UTC().Format(timeLayout)
 	status := "Accepted by lawyer"
 	systemBody := fmt.Sprintf("%s accepted the case.", actorName)
+	outcome := "Not decided"
 	if decision == "declined" {
 		status = "Declined by lawyer"
 		systemBody = fmt.Sprintf("%s declined the case.", actorName)
 	} else if decision == "completed" {
 		status = "Case completed"
 		systemBody = fmt.Sprintf("%s ended the case.", actorName)
+		if strings.TrimSpace(req.Outcome) != "" {
+			outcome = strings.TrimSpace(req.Outcome)
+		}
 	}
 
 	if note := strings.TrimSpace(req.Note); note != "" {
@@ -389,9 +393,9 @@ func (s *Store) DecideCase(ctx context.Context, caseID int64, actorName string, 
 
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE cases
-		SET status = ?, decision_status = ?, decision_note = ?, progress_percent = ?, responded_at = ?
+		SET status = ?, decision_status = ?, decision_note = ?, progress_percent = ?, responded_at = ?, outcome = ?
 		WHERE id = ?`,
-		status, decision, strings.TrimSpace(req.Note), progressPercent, now, caseID,
+		status, decision, strings.TrimSpace(req.Note), progressPercent, now, outcome, caseID,
 	); err != nil {
 		return models.CaseDetails{}, err
 	}

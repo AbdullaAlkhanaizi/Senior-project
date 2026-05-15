@@ -46,6 +46,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/auth/signup", s.handleSignup)
 	mux.HandleFunc("/api/auth/guest", s.handleGuest)
 	mux.HandleFunc("/api/admin/lawyers", s.handleAdminLawyers)
+	mux.HandleFunc("/api/admin/stats", s.handleAdminStats)
+	mux.HandleFunc("/api/admin/users", s.handleAdminUsers)
 	mux.HandleFunc("/api/dashboard", s.handleDashboard)
 	mux.HandleFunc("/api/ai/chat", s.handleAIChat)
 	mux.HandleFunc("/api/reviews", s.handleReviews)

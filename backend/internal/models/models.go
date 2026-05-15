@@ -77,6 +77,7 @@ type CreateCaseRequest struct {
 type CaseDecisionRequest struct {
 	Decision string `json:"decision"`
 	Note     string `json:"note"`
+	Outcome  string `json:"outcome"`
 }
 
 type UpsertCaseUpdateRequest struct {
@@ -166,3 +167,30 @@ type CreateReviewRequest struct {
 	Body     string `json:"review"`
 	Rating   int    `json:"rating"`
 }
+
+type LawyerCompletedStats struct {
+	LawyerID       int64  `json:"lawyerId"`
+	LawyerName     string `json:"lawyerName"`
+	TotalCompleted int    `json:"totalCompleted"`
+	Won            int    `json:"won"`
+	Lost           int    `json:"lost"`
+	NotDecided     int    `json:"notDecided"`
+}
+
+type AdminStatsResponse struct {
+	TotalUsers     int                    `json:"totalUsers"`
+	TotalLawyers   int                    `json:"totalLawyers"`
+	TotalCases     int                    `json:"totalCases"`
+	ActiveCases    int                    `json:"activeCases"`
+	CompletedCases int                    `json:"completedCases"`
+	LawyerStats    []LawyerCompletedStats `json:"lawyerStats"`
+}
+
+type AdminUser struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	Role      string `json:"role"`
+	CreatedAt string `json:"createdAt"`
+}
+

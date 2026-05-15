@@ -127,6 +127,12 @@ func (s *Store) Migrate(ctx context.Context) error {
 	if err := s.ensureColumn(ctx, "cases", "responded_at", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
+	if err := s.ensureColumn(ctx, "cases", "outcome", "TEXT NOT NULL DEFAULT 'Not decided'"); err != nil {
+		return err
+	}
+
+	// Temporarily reset all existing outcomes as requested by the user
+	_, _ = s.db.ExecContext(ctx, "UPDATE cases SET outcome = 'Not decided'")
 
 	if _, err := s.db.ExecContext(ctx, `
 		UPDATE cases
