@@ -8,16 +8,8 @@ const (
 )
 
 type DashboardResponse struct {
-	FAQSuggestions []FAQSuggestion `json:"faqSuggestions"`
 	Lawyers        []Lawyer        `json:"lawyers"`
 	ActiveCase     *CaseDetails    `json:"activeCase,omitempty"`
-}
-
-type FAQSuggestion struct {
-	ID       int64  `json:"id"`
-	Question string `json:"question"`
-	Category string `json:"category"`
-	Priority int    `json:"priority"`
 }
 
 type Lawyer struct {

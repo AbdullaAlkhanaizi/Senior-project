@@ -642,7 +642,7 @@ export default function AuthClient() {
               <div className="feature-icon"><ChatIcon /></div>
               <div>
                 <span className="feature-text">
-                  Try our <strong>AI-powered legal FAQ bot.</strong>
+                  Try our <strong>AI-powered legal bot.</strong>
                 </span>
               </div>
             </li>

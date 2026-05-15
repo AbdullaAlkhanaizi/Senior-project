@@ -4,7 +4,7 @@ This repository is a local starter for a legal consultant website with:
 
 - A login page for admins, lawyers, and clients plus guest preview access.
 - A separate client sign up page.
-- A home hub page that points users to the AI page, FAQ page, or messaging page.
+- A home hub page that points users to the AI page or messaging page.
 - A chatbot window placeholder that you can connect to your own AI and legal knowledge source.
 - Lawyer and law firm referral cards for complex questions.
 - A client-lawyer messaging workspace with file upload support.
@@ -12,7 +12,6 @@ This repository is a local starter for a legal consultant website with:
   - clients sign up from the public form
   - lawyers are created by admins only
   - admins cannot open client-lawyer message threads
-- FAQ suggestions that can be populated by the chatbot.
 - A Go backend with SQLite storage.
 - A Next.js frontend using normal HTML and CSS.
 
@@ -24,8 +23,8 @@ This repository is a local starter for a legal consultant website with:
 - `backend/internal/httpapi/` separated HTTP handlers for auth, dashboard, health, and cases.
 - `backend/internal/models/` shared request and response structs.
 - `backend/internal/store/` database logic, migrations, seed data, auth, cases, and uploads.
-- `frontend/app/` Next.js routes for login, signup, home, AI, FAQ, and messaging.
-- `frontend/components/` reusable UI parts for auth, navigation, AI, FAQ, and messaging.
+- `frontend/app/` Next.js routes for login, signup, home, AI, and messaging.
+- `frontend/components/` reusable UI parts for auth, navigation, AI, and messaging.
 - `frontend/lib/` API helpers and local session storage helpers.
 
 ## Run both frontend and backend together

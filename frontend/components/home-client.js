@@ -18,11 +18,11 @@ const QUICK_ACTIONS = [
     tone: "warm"
   },
   {
-    href: "/faq",
-    title: "Browse FAQs",
-    description: "Find answers to common legal questions and understand your rights.",
-    cta: "Browse FAQs",
-    icon: "chat",
+    href: "/review",
+    title: "Lawyer Reviews",
+    description: "Read client feedback and find the right legal professional for your case.",
+    cta: "View Reviews",
+    icon: "shield-star",
     tone: "sun"
   },
   {
@@ -68,9 +68,9 @@ const PLATFORM_FEATURES = [
     items: ["Instant legal answers", "Local laws and regulations", "Smart recommendations"]
   },
   {
-    title: "Legal Documents",
-    icon: "document",
-    items: ["Ready-to-use templates", "AI-assisted drafting", "Save and manage files"]
+    title: "Labor Calculator",
+    icon: "calculator",
+    items: ["End of service benefits", "Salary calculation", "Leave entitlements"]
   },
   {
     title: "Connect with Lawyers",
@@ -97,19 +97,11 @@ const HOW_IT_WORKS = [
   }
 ];
 
-const FAQ_SUMMARIES = {
-  "Is running a red light illegal?": "Review the traffic-law basics and when a fine may need follow-up.",
-  "Can my employer cut my salary without notice?": "Check the usual notice and contract issues before responding.",
-  "How do I respond to a landlord dispute notice?": "Start by preserving the notice, dates, and supporting evidence.",
-  "What should I do after getting a store theft accusation?": "Stay calm, document what happened, and ask for legal guidance."
-};
-
 const FOOTER_COLUMNS = [
   {
     title: "Platform",
     links: [
       { label: "AI Assistant", href: "/ai" },
-      { label: "FAQs", href: "/faq" },
       { label: "Messaging", href: "/messaging" },
       { label: "Labor Calculator", href: "/labor" }
     ]
@@ -134,8 +126,6 @@ const FOOTER_COLUMNS = [
   {
     title: "Support",
     links: [
-      { label: "Help Center", href: "/faq" },
-      { label: "Guides", href: "/faq" },
       { label: "Contact Support", href: "/messaging" }
     ]
   }
@@ -310,15 +300,6 @@ function StarRating({ rating }) {
   );
 }
 
-function getFAQIcon(category = "") {
-  const normalized = category.toLowerCase();
-  if (normalized.includes("traffic")) return "traffic";
-  if (normalized.includes("employment")) return "employment";
-  if (normalized.includes("housing")) return "housing";
-  if (normalized.includes("criminal")) return "criminal";
-  return "question";
-}
-
 function getInitials(name = "") {
   return name
     .split(" ")
@@ -354,12 +335,6 @@ export default function HomeClient() {
 
     load();
   }, [router]);
-
-  const popularQuestions = useMemo(() => {
-    return [...(dashboard?.faqSuggestions || [])]
-      .sort((left, right) => left.priority - right.priority)
-      .slice(0, 4);
-  }, [dashboard]);
 
   const featuredReviews = useMemo(() => INITIAL_REVIEWS.slice(0, 3), []);
 
@@ -477,37 +452,6 @@ export default function HomeClient() {
             <ArrowIcon />
           </Link>
         </div>
-      </section>
-
-      <section className="login-home-faq-section" aria-labelledby="popular-questions-title">
-        <div className="login-home-section-bar">
-          <h2 id="popular-questions-title">Popular Questions</h2>
-          <Link href="/faq">
-            Browse All FAQs
-            <ArrowIcon />
-          </Link>
-        </div>
-
-        {popularQuestions.length ? (
-          <div className="login-home-faq-grid">
-            {popularQuestions.map((item) => (
-              <Link key={item.id} href="/faq" className="login-home-faq-card">
-                <span className="login-home-faq-tag">
-                  <LegalHomeIcon type={getFAQIcon(item.category)} />
-                  {item.category}
-                </span>
-                <h3>{item.question}</h3>
-                <p>{FAQ_SUMMARIES[item.question] || "Open the FAQ page to review the system guidance for this topic."}</p>
-                <strong>
-                  Learn More
-                  <ArrowIcon />
-                </strong>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <p className="login-home-empty">Popular questions will appear here once the dashboard loads.</p>
-        )}
       </section>
 
       <section className="login-home-steps-section" id="how-it-works" aria-labelledby="how-it-works-title">

@@ -87,12 +87,6 @@ func (s *Store) Migrate(ctx context.Context) error {
 			created_at TEXT NOT NULL,
 			FOREIGN KEY (case_id) REFERENCES cases(id)
 		);`,
-		`CREATE TABLE IF NOT EXISTS faq_suggestions (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			question TEXT NOT NULL,
-			category TEXT NOT NULL,
-			priority INTEGER NOT NULL
-		);`,
 	}
 
 	for _, statement := range statements {
@@ -169,9 +163,6 @@ func (s *Store) Seed(ctx context.Context) error {
 		return err
 	}
 	if err := s.seedSampleCase(ctx, sampleClient); err != nil {
-		return err
-	}
-	if err := s.seedFAQs(ctx); err != nil {
 		return err
 	}
 
@@ -408,35 +399,6 @@ func (s *Store) seedSampleCase(ctx context.Context, sampleClient models.AuthResp
 	}
 
 	return tx.Commit()
-}
-
-func (s *Store) seedFAQs(ctx context.Context) error {
-	var faqCount int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM faq_suggestions`).Scan(&faqCount); err != nil {
-		return err
-	}
-	if faqCount > 0 {
-		return nil
-	}
-
-	faqSeeds := []models.FAQSuggestion{
-		{Question: "Is running a red light illegal?", Category: "Traffic", Priority: 1},
-		{Question: "What should I do after getting a store theft accusation?", Category: "Criminal", Priority: 2},
-		{Question: "Can my employer cut my salary without notice?", Category: "Employment", Priority: 3},
-		{Question: "How do I respond to a landlord dispute notice?", Category: "Housing", Priority: 4},
-	}
-
-	for _, faq := range faqSeeds {
-		if _, err := s.db.ExecContext(ctx, `
-			INSERT INTO faq_suggestions (question, category, priority)
-			VALUES (?, ?, ?)`,
-			faq.Question, faq.Category, faq.Priority,
-		); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (s *Store) ensureColumn(ctx context.Context, tableName, columnName, definition string) error {

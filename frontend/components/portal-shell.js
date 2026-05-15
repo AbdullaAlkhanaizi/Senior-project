@@ -53,13 +53,13 @@ export default function PortalShell({ title, description, hideHero, showEyebrow 
       <div className="portal-nav-shell">
         <header className="portal-navbar">
           <Link href="/" className="portal-brand">
-            LEGAL CONSULTANT
+            Qanoni
           </Link>
           <div className="portal-nav-right">
             <nav className="portal-links">
               <Link href="/home" className={pathname === "/home" ? "active" : ""}>Home</Link>
               <Link href="/ai" className={pathname === "/ai" ? "active" : ""}>AI</Link>
-              <Link href="/faq" className={pathname === "/faq" ? "active" : ""}>FAQ</Link>
+              <Link href="/review" className={pathname === "/review" ? "active" : ""}>Reviews</Link>
               {showMessaging ? (
                 <Link href="/messaging" className={pathname === "/messaging" ? "active" : ""}>Messaging</Link>
               ) : null}

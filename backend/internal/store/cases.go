@@ -13,28 +13,6 @@ import (
 	"senior-project/backend/internal/models"
 )
 
-func (s *Store) ListFAQSuggestions(ctx context.Context) ([]models.FAQSuggestion, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, question, category, priority
-		FROM faq_suggestions
-		ORDER BY priority ASC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var items []models.FAQSuggestion
-	for rows.Next() {
-		var item models.FAQSuggestion
-		if err := rows.Scan(&item.ID, &item.Question, &item.Category, &item.Priority); err != nil {
-			return nil, err
-		}
-		items = append(items, item)
-	}
-
-	return items, rows.Err()
-}
-
 func (s *Store) ListLawyers(ctx context.Context) ([]models.Lawyer, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, COALESCE(user_id, 0), name, firm, specialty, city, email, phone, bio

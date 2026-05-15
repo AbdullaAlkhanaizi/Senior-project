@@ -23,12 +23,6 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	faqs, err := s.store.ListFAQSuggestions(r.Context())
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
 	lawyers, err := s.store.ListLawyers(r.Context())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -51,7 +45,6 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, models.DashboardResponse{
-		FAQSuggestions: faqs,
 		Lawyers:        lawyers,
 		ActiveCase:     activeCase,
 	})
