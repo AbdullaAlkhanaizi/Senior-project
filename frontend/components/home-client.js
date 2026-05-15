@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { getDashboard } from "../lib/api";
-import { INITIAL_REVIEWS } from "../lib/reviews";
+import { getDashboard, getReviews } from "../lib/api";
 import { loadSession } from "../lib/session";
 
 const QUICK_ACTIONS = [
@@ -315,6 +314,8 @@ export default function HomeClient() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
 
+  const [featuredReviews, setFeaturedReviews] = useState([]);
+
   useEffect(() => {
     const currentSession = loadSession();
     if (!currentSession) {
@@ -326,8 +327,9 @@ export default function HomeClient() {
 
     async function load() {
       try {
-        const data = await getDashboard();
-        setDashboard(data);
+        const [dashData, revData] = await Promise.all([getDashboard(), getReviews()]);
+        setDashboard(dashData);
+        setFeaturedReviews((revData || []).slice(0, 3));
       } catch (requestError) {
         setError(requestError.message);
       }
@@ -335,8 +337,6 @@ export default function HomeClient() {
 
     load();
   }, [router]);
-
-  const featuredReviews = useMemo(() => INITIAL_REVIEWS.slice(0, 3), []);
 
   if (!ready) {
     return (

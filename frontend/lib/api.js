@@ -166,3 +166,21 @@ export async function reorderCaseSteps(caseId, updateIds) {
   });
   return parseJSON(response);
 }
+
+export async function getReviews() {
+  const response = await fetch(`${API_BASE}/api/reviews`, {
+    cache: "no-store",
+    headers: withAuthHeaders()
+  });
+  return parseJSON(response);
+}
+
+export async function createReview(payload) {
+  const response = await fetch(`${API_BASE}/api/reviews`, {
+    method: "POST",
+    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload)
+  });
+  return parseJSON(response);
+}
+

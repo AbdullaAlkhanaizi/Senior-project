@@ -147,3 +147,22 @@ type AIChatResponse struct {
 	Disclaimer       string        `json:"disclaimer"`
 	SuggestedActions []string      `json:"suggestedActions"`
 }
+
+type Review struct {
+	ID         int64  `json:"id"`
+	UserID     int64  `json:"userId"`
+	UserName   string `json:"name"`
+	LawyerID   int64  `json:"lawyerId"`
+	LawyerName string `json:"lawyerName"`
+	Title      string `json:"title"`
+	Body       string `json:"review"`
+	Rating     int    `json:"rating"`
+	CreatedAt  string `json:"date"`
+}
+
+type CreateReviewRequest struct {
+	LawyerID int64  `json:"lawyerId"`
+	Title    string `json:"title"`
+	Body     string `json:"review"`
+	Rating   int    `json:"rating"`
+}

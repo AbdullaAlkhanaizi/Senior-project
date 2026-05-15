@@ -87,6 +87,17 @@ func (s *Store) Migrate(ctx context.Context) error {
 			created_at TEXT NOT NULL,
 			FOREIGN KEY (case_id) REFERENCES cases(id)
 		);`,
+		`CREATE TABLE IF NOT EXISTS reviews (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			lawyer_id INTEGER NOT NULL,
+			title TEXT NOT NULL,
+			body TEXT NOT NULL,
+			rating INTEGER NOT NULL,
+			created_at TEXT NOT NULL,
+			FOREIGN KEY (user_id) REFERENCES users(id),
+			FOREIGN KEY (lawyer_id) REFERENCES lawyers(id)
+		);`,
 	}
 
 	for _, statement := range statements {

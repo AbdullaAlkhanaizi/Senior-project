@@ -48,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/admin/lawyers", s.handleAdminLawyers)
 	mux.HandleFunc("/api/dashboard", s.handleDashboard)
 	mux.HandleFunc("/api/ai/chat", s.handleAIChat)
+	mux.HandleFunc("/api/reviews", s.handleReviews)
 	mux.HandleFunc("/api/cases", s.handleCases)
 	mux.HandleFunc("/api/cases/", s.handleCaseRoutes)
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(s.config.UploadDir))))

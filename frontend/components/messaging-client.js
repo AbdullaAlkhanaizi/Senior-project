@@ -12,12 +12,13 @@ import {
   getCaseDetails,
   getCases,
   getDashboard,
+  getReviews,
   reorderCaseSteps,
   sendCaseMessage,
   updateCaseStep,
   uploadCaseAttachment
 } from "../lib/api";
-import { INITIAL_REVIEWS, getLawyerReviewSummary } from "../lib/reviews";
+import { getLawyerReviewSummary } from "../lib/reviews";
 import { loadSession } from "../lib/session";
 
 const STEP_STATE_OPTIONS = ["completed", "current", "upcoming"];
@@ -75,6 +76,7 @@ export default function MessagingClient() {
   const [session, setSession] = useState(null);
   const [lawyers, setLawyers] = useState([]);
   const [cases, setCases] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [activeCase, setActiveCase] = useState(null);
   const [selectedCaseId, setSelectedCaseId] = useState(null);
   const [selectedLawyerId, setSelectedLawyerId] = useState(0);
@@ -226,10 +228,10 @@ export default function MessagingClient() {
 
   const lawyerReviewSummaries = useMemo(() => {
     return lawyers.reduce((summaries, lawyer) => {
-      summaries[lawyer.name] = getLawyerReviewSummary(INITIAL_REVIEWS, lawyer.name);
+      summaries[lawyer.name] = getLawyerReviewSummary(reviews, lawyer.name);
       return summaries;
     }, {});
-  }, [lawyers]);
+  }, [lawyers, reviews]);
 
   const sortedCases = useMemo(() => {
     return [...cases].sort((a, b) => {

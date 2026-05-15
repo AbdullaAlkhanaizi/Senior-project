@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
-import { INITIAL_REVIEWS, getReviewsForLawyer, getLawyerReviewSummary, normalizeLawyerReviewKey } from "../lib/reviews";
-
-const LAWYER_OPTIONS = ["All lawyers", ...Array.from(new Set(INITIAL_REVIEWS.map((review) => review.lawyerName)))];
+import { getReviewsForLawyer, getLawyerReviewSummary, normalizeLawyerReviewKey } from "../lib/reviews";
+import { getDashboard, getReviews, createReview } from "../lib/api";
 
 function ChevronIcon({ open }) {
   return (
@@ -47,27 +46,51 @@ function renderStars(ratingValue, { allowPartial = false } = {}) {
 
 export default function ReviewClient({ initialLawyer = "" }) {
   const [title, setTitle] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [review, setReview] = useState("");
   const [rating, setRating] = useState(5);
-  const [submittedReviews, setSubmittedReviews] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [lawyers, setLawyers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("newest");
   const [showForm, setShowForm] = useState(true);
+  
+  const [selectedLawyerId, setSelectedLawyerId] = useState("");
+  const [filterLawyerId, setFilterLawyerId] = useState("");
 
-  const matchedInitialLawyer = LAWYER_OPTIONS.find(
-    (option) => normalizeLawyerReviewKey(option) === normalizeLawyerReviewKey(initialLawyer)
-  );
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const dashRes = await getDashboard();
+        const loadedLawyers = dashRes.lawyers || [];
+        setLawyers(loadedLawyers);
 
-  const [selectedLawyer, setSelectedLawyer] = useState(matchedInitialLawyer || "All lawyers");
-  const selectedLawyerOptions = LAWYER_OPTIONS.filter((option) => option !== "All lawyers");
+        if (loadedLawyers.length > 0) {
+          const matchedInitial = loadedLawyers.find(
+            (l) => normalizeLawyerReviewKey(l.name) === normalizeLawyerReviewKey(initialLawyer)
+          );
+          const defaultLId = matchedInitial ? matchedInitial.id : loadedLawyers[0].id;
+          setSelectedLawyerId(defaultLId);
+          setFilterLawyerId(defaultLId);
+        }
 
-  const allReviews = useMemo(() => [...submittedReviews, ...INITIAL_REVIEWS], [submittedReviews]);
+        const revRes = await getReviews();
+        setReviews(revRes || []);
+      } catch (err) {
+        console.error("Failed to load data for reviews", err);
+      }
+    }
+    loadData();
+  }, [initialLawyer]);
+
+  const selectedLawyerObj = useMemo(() => {
+    return lawyers.find((l) => String(l.id) === String(filterLawyerId));
+  }, [lawyers, filterLawyerId]);
+
+  const selectedLawyerName = selectedLawyerObj ? selectedLawyerObj.name : "";
 
   const visibleReviews = useMemo(
-    () => (selectedLawyer === "All lawyers" ? allReviews : getReviewsForLawyer(allReviews, selectedLawyer)),
-    [allReviews, selectedLawyer]
+    () => getReviewsForLawyer(reviews, selectedLawyerName),
+    [reviews, selectedLawyerName]
   );
 
   const filteredReviews = useMemo(() => {
@@ -75,11 +98,11 @@ export default function ReviewClient({ initialLawyer = "" }) {
       .filter((item) => {
         const normalizedSearch = searchTerm.toLowerCase();
         return (
-          item.name.toLowerCase().includes(normalizedSearch) ||
-          item.title.toLowerCase().includes(normalizedSearch) ||
-          item.review.toLowerCase().includes(normalizedSearch) ||
-          item.lawyerName.toLowerCase().includes(normalizedSearch) ||
-          item.date.includes(searchTerm)
+          (item.name || "").toLowerCase().includes(normalizedSearch) ||
+          (item.title || "").toLowerCase().includes(normalizedSearch) ||
+          (item.review || "").toLowerCase().includes(normalizedSearch) ||
+          (item.lawyerName || "").toLowerCase().includes(normalizedSearch) ||
+          (item.date || "").includes(searchTerm)
         );
       })
       .sort((a, b) => {
@@ -92,8 +115,8 @@ export default function ReviewClient({ initialLawyer = "" }) {
   }, [visibleReviews, searchTerm, sortOption]);
 
   const selectedSummary = useMemo(
-    () => getLawyerReviewSummary(allReviews, selectedLawyer === "All lawyers" ? "" : selectedLawyer),
-    [allReviews, selectedLawyer]
+    () => getLawyerReviewSummary(reviews, selectedLawyerName),
+    [reviews, selectedLawyerName]
   );
 
   const ratingCounts = useMemo(() => {
@@ -106,36 +129,31 @@ export default function ReviewClient({ initialLawyer = "" }) {
   const maxCount = Math.max(...ratingCounts.map((item) => item.count), 0);
 
   function handleToggleForm() {
-    if (!showForm && selectedLawyer === "All lawyers" && selectedLawyerOptions[0]) {
-      setSelectedLawyer(selectedLawyerOptions[0]);
-    }
     setShowForm((current) => !current);
   }
 
-  function handleSubmit() {
-    if (!name || !review || !title || selectedLawyer === "All lawyers") {
-      alert("Please choose a lawyer and fill all required fields.");
+  async function handleSubmit() {
+    if (!review || !title || !selectedLawyerId) {
+      alert("Please fill all required fields and select a lawyer.");
       return;
     }
 
-    const newReview = {
-      id: Date.now(),
-      lawyerName: selectedLawyer,
-      title,
-      name,
-      email,
-      review,
-      rating,
-      date: new Date().toISOString().split("T")[0]
-    };
+    try {
+      const newReview = await createReview({
+        lawyerId: Number(selectedLawyerId),
+        title,
+        review,
+        rating
+      });
 
-    setSubmittedReviews([newReview, ...submittedReviews]);
-    setTitle("");
-    setName("");
-    setEmail("");
-    setReview("");
-    setRating(5);
-    setShowForm(false);
+      setReviews([newReview, ...reviews]);
+      setTitle("");
+      setReview("");
+      setRating(5);
+      setShowForm(false);
+    } catch (error) {
+      alert(error.message || "Failed to submit review.");
+    }
   }
 
   return (
@@ -191,15 +209,15 @@ export default function ReviewClient({ initialLawyer = "" }) {
             {showForm ? (
               <div className="review-form">
                 <div className="review-field">
-                  <label htmlFor="review-lawyer">Lawyer Dropdown</label>
+                  <label htmlFor="review-lawyer">Lawyer</label>
                   <select
                     id="review-lawyer"
-                    value={selectedLawyer === "All lawyers" ? selectedLawyerOptions[0] || "" : selectedLawyer}
-                    onChange={(event) => setSelectedLawyer(event.target.value)}
+                    value={selectedLawyerId}
+                    onChange={(event) => setSelectedLawyerId(event.target.value)}
                   >
-                    {selectedLawyerOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
+                    {lawyers.map((lawyer) => (
+                      <option key={lawyer.id} value={lawyer.id}>
+                        {lawyer.name}
                       </option>
                     ))}
                   </select>
@@ -214,30 +232,6 @@ export default function ReviewClient({ initialLawyer = "" }) {
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
                   />
-                </div>
-
-                <div className="review-form-grid">
-                  <div className="review-field">
-                    <label htmlFor="review-name">Your Full Name</label>
-                    <input
-                      id="review-name"
-                      type="text"
-                      placeholder="e.g., Alice"
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                    />
-                  </div>
-
-                  <div className="review-field">
-                    <label htmlFor="review-email">Your Email Address</label>
-                    <input
-                      id="review-email"
-                      type="email"
-                      placeholder="e.g., alice@example.com"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                    />
-                  </div>
                 </div>
 
                 <div className="review-field">
@@ -284,10 +278,14 @@ export default function ReviewClient({ initialLawyer = "" }) {
           <div className="search-sort">
             <div className="review-filter-field">
               <label htmlFor="existing-lawyer-filter">Attorney</label>
-              <select id="existing-lawyer-filter" value={selectedLawyer} onChange={(event) => setSelectedLawyer(event.target.value)}>
-                {LAWYER_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+              <select 
+                id="existing-lawyer-filter" 
+                value={filterLawyerId} 
+                onChange={(event) => setFilterLawyerId(event.target.value)}
+              >
+                {lawyers.map((lawyer) => (
+                  <option key={lawyer.id} value={lawyer.id}>
+                    {lawyer.name}
                   </option>
                 ))}
               </select>
@@ -327,7 +325,7 @@ export default function ReviewClient({ initialLawyer = "" }) {
                   {renderStars(item.rating)}
                 </div>
                 <p className="review-meta">
-                  By: {item.name} / {item.date}
+                  By: {item.name} / {item.date && new Date(item.date).toLocaleDateString() !== "Invalid Date" ? new Date(item.date).toLocaleDateString() : item.date}
                 </p>
                 <p className="review-text">{item.review}</p>
               </article>
