@@ -7401,6 +7401,10 @@ a.sm-btn:hover {
   color: #211713;
   font-family: "Playfair Display", Georgia, serif;
   letter-spacing: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  line-height: 1.2;
 }
 
 .login-home-hero-copy h1 {

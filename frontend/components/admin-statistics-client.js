@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { getAdminStats } from "../lib/api";
 
 function formatCurrency(value) {
@@ -51,6 +51,8 @@ export default function AdminStatisticsClient() {
   const [loading, setLoading] = useState(true);
   const [showLawyerStats, setShowLawyerStats] = useState(false);
   const [showAIStats, setShowAIStats] = useState(false);
+  const lawyerSectionRef = useRef(null);
+  const aiSectionRef = useRef(null);
 
   useEffect(() => {
     async function loadStats() {
@@ -67,6 +69,24 @@ export default function AdminStatisticsClient() {
     loadStats();
   }, []);
 
+  useEffect(() => {
+  if (showLawyerStats) {
+    lawyerSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }
+}, [showLawyerStats]);
+
+useEffect(() => {
+  if (showAIStats) {
+    aiSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }
+}, [showAIStats]);
+
   return (
     <main className="login-home-page">
       <section className="login-home-action-section">
@@ -76,9 +96,9 @@ export default function AdminStatisticsClient() {
         </div>
         {error ? <p className="feedback error">{error}</p> : null}
 
-        {loading ? (
+        {loading && (
           <p style={{ textAlign: "center" }}>Loading statistics...</p>
-        ) : stats ? (
+        )} {!loading && stats && (
           <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
             <div
               className="login-home-action-grid"
@@ -105,8 +125,8 @@ export default function AdminStatisticsClient() {
               })}
             </div>
 
-            {showLawyerStats ? (
-              <div style={{ backgroundColor: "white", borderRadius: "10px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", padding: "1.5rem", marginBottom: "1.5rem", overflowX: "auto" }}>
+            {showLawyerStats && (
+                <div ref={lawyerSectionRef} style={{ backgroundColor: "white", borderRadius: "10px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", padding: "1.5rem", marginBottom: "1.5rem", overflowX: "auto" }}>
                 <h2 style={{ marginTop: 0, marginBottom: "1rem" }}>Completed Cases Breakdown</h2>
                 <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center" }}>
                   <thead>
@@ -137,10 +157,10 @@ export default function AdminStatisticsClient() {
                   </tbody>
                 </table>
               </div>
-            ) : null}
+            ) }
 
-            {showAIStats ? (
-              <div style={{ backgroundColor: "white", borderRadius: "10px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", padding: "1.5rem" }}>
+            {showAIStats && (
+                <div ref={aiSectionRef} style={{ backgroundColor: "white", borderRadius: "10px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", padding: "1.5rem" }}>
                 <h2 style={{ marginTop: 0, marginBottom: "1rem" }}>AI Cost Breakdown</h2>
                 <div style={{ display: "grid", gap: "0.85rem", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
                   {renderInfoTile("Total AI Requests", formatNumber(stats.aiUsage?.totalRequests))}
@@ -151,9 +171,9 @@ export default function AdminStatisticsClient() {
                   {renderInfoTile("Average Cost Per Request", formatCurrency(stats.aiUsage?.averageCostPerRequest))}
                 </div>
               </div>
-            ) : null}
+            ) }
           </div>
-        ) : null}
+        )}
       </section>
     </main>
   );
