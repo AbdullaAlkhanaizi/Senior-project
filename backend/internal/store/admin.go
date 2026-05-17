@@ -200,6 +200,29 @@ func (s *Store) GetAdminStats(ctx context.Context) (models.AdminStatsResponse, e
 	return stats, nil
 }
 
+func (s *Store) UpdateAdminUser(ctx context.Context, id int64, name, email, role string) (*models.AdminUser, error) {
+	_, err := s.db.ExecContext(ctx,
+		"UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?",
+		name, email, role, id,
+	)
+	if err != nil {
+		return nil, err
+	}
+	var u models.AdminUser
+	err = s.db.QueryRowContext(ctx,
+		"SELECT id, name, email, role, created_at FROM users WHERE id = ?", id,
+	).Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (s *Store) DeleteAdminUser(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
+	return err
+}
+
 func (s *Store) GetAdminUsers(ctx context.Context) ([]models.AdminUser, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT id, name, email, role, created_at FROM users ORDER BY created_at DESC")
 	if err != nil {

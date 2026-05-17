@@ -79,6 +79,22 @@ export async function getAdminUsers() {
   return parseJSON(response);
 }
 
+export async function updateAdminUser(userId, payload) {
+  const response = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+    method: "PUT",
+    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload)
+  });
+  return parseJSON(response);
+}
+
+export async function deleteAdminUser(userId) {
+  const response = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: withAuthHeaders()
+  });
+  return parseJSON(response);
+}
 
 export async function getDashboard() {
   const response = await fetch(`${API_BASE}/api/dashboard`, {
