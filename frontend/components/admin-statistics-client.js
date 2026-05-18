@@ -104,7 +104,7 @@ useEffect(() => {
               className="login-home-action-grid"
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
                 gap: "1.5rem",
                 marginBottom: "1.5rem"
               }}
@@ -162,7 +162,7 @@ useEffect(() => {
             {showAIStats && (
                 <div ref={aiSectionRef} style={{ backgroundColor: "white", borderRadius: "10px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", padding: "1.5rem" }}>
                 <h2 style={{ marginTop: 0, marginBottom: "1rem" }}>AI Cost Breakdown</h2>
-                <div style={{ display: "grid", gap: "0.85rem", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+                <div style={{ display: "grid", gap: "0.85rem", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
                   {renderInfoTile("Total AI Requests", formatNumber(stats.aiUsage?.totalRequests))}
                   {renderInfoTile("Case-Linked Requests", formatNumber(stats.aiUsage?.caseLinkedRequests))}
                   {renderInfoTile("Prompt Tokens", formatNumber(stats.aiUsage?.promptTokens))}
