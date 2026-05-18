@@ -624,6 +624,14 @@ func (s *Store) DeleteCaseUpdate(ctx context.Context, caseID, updateID int64) (m
 	}
 	defer tx.Rollback()
 
+	var count int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM case_updates WHERE case_id = ?`, caseID).Scan(&count); err != nil {
+		return models.CaseDetails{}, err
+	}
+	if count <= 1 {
+		return models.CaseDetails{}, errors.New("cannot remove the last case step")
+	}
+
 	result, err := tx.ExecContext(ctx, `
 		DELETE FROM case_updates
 		WHERE id = ? AND case_id = ?`,

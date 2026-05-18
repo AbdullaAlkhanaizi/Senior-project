@@ -146,11 +146,36 @@ func (s *Server) handleCaseRoutes(w http.ResponseWriter, r *http.Request) {
 		s.handleCaseDecision(w, r, caseID, current)
 	case "updates":
 		s.handleCaseUpdates(w, r, caseID, parts, current)
+	case "visibility":
+		s.handleCaseVisibility(w, r, caseID, current)
 	case "ws":
 		s.handleCaseWS(w, r, caseID, current)
 	default:
 		writeError(w, http.StatusNotFound, "not found")
 	}
+}
+
+func (s *Server) handleCaseVisibility(w http.ResponseWriter, r *http.Request, caseID int64, current *viewer) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var req struct {
+		Hidden bool `json:"hidden"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json body")
+		return
+	}
+
+	details, err := s.store.UpdateCaseVisibility(r.Context(), caseID, current.Role, current.ID, current.LawyerID, req.Hidden)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, details)
 }
 
 func (s *Server) handleCaseMessages(w http.ResponseWriter, r *http.Request, caseID int64, current *viewer) {

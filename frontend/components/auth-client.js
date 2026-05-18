@@ -72,7 +72,7 @@ export default function AuthClient() {
     try {
       const session = await loginUser({ email, password });
       saveSession(session);
-      router.push("/home");
+      router.push("/messaging");
     } catch (requestError) {
       setError(requestError.message);
       setStatus("");
@@ -85,7 +85,7 @@ export default function AuthClient() {
     try {
       const session = await continueAsGuest({ name: "Guest User" });
       saveSession(session);
-      router.push("/home");
+      router.push("/messaging");
     } catch (requestError) {
       setError(requestError.message);
       setStatus("");

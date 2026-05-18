@@ -90,7 +90,7 @@ export default function SignupClient() {
     try {
       const session = await signupUser({ name, email, password });
       saveSession(session);
-      router.push("/home");
+      router.push("/messaging");
     } catch (requestError) {
       setError(requestError.message);
       setStatus("");

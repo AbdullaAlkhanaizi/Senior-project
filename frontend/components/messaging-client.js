@@ -97,12 +97,50 @@ export default function MessagingClient() {
   const [showEndCaseForm, setShowEndCaseForm] = useState(false);
   const [caseOutcome, setCaseOutcome] = useState("");
   const [showHiddenCompletedCases, setShowHiddenCompletedCases] = useState(false);
+  const [caseFilter, setCaseFilter] = useState("all");
 
   const role = session?.role || "guest";
   const isAdmin = role === "admin";
   const isGuest = role === "guest";
   const isClient = role === "client";
   const isLawyer = role === "lawyer";
+
+  async function handleCaseVisibilityToggle(caseItem, hidden) {
+    if (!caseItem?.id) return;
+    setError("");
+    setStatus(hidden ? "Hiding case..." : "Showing case...");
+
+    try {
+      await updateCaseVisibility(caseItem.id, hidden);
+      
+      setCases((currentCases) => 
+        currentCases.map((c) => {
+          if (c.id === caseItem.id) {
+            return {
+              ...c,
+              ...(isLawyer ? { hiddenByLawyer: hidden } : { hiddenByClient: hidden })
+            };
+          }
+          return c;
+        })
+      );
+
+      if (activeCase?.case?.id === caseItem.id) {
+        setActiveCase((prev) => ({
+          ...prev,
+          case: {
+            ...prev.case,
+            ...(isLawyer ? { hiddenByLawyer: hidden } : { hiddenByClient: hidden })
+          }
+        }));
+      }
+
+      setStatus(hidden ? "Case hidden." : "Case visible.");
+    } catch (err) {
+      setError(err.message);
+      setStatus("");
+    }
+  }
 
   useEffect(() => {
     const timerId = setTimeout(() => {
@@ -289,6 +327,10 @@ export default function MessagingClient() {
       if (!showHiddenCompletedCases && isCompletedLike && isHidden) {
         return false;
       }
+      if (caseFilter === "pending" && item.decisionStatus !== "pending") return false;
+      if (caseFilter === "inprogress" && item.decisionStatus !== "accepted") return false;
+      if (caseFilter === "completed" && item.decisionStatus !== "completed") return false;
+      if (caseFilter === "declined" && item.decisionStatus !== "declined") return false;
       return true;
     });
 
@@ -299,7 +341,7 @@ export default function MessagingClient() {
       if (!aIsCompleted && bIsCompleted) return -1;
       return 0;
     });
-  }, [cases, isLawyer, showHiddenCompletedCases]);
+  }, [cases, isLawyer, showHiddenCompletedCases, caseFilter]);
 
   const activeCaseCanToggleVisibility =
     (isLawyer || isClient) &&
@@ -760,6 +802,11 @@ export default function MessagingClient() {
 
   async function handleStepDelete(stepId) {
     if (!isLawyer || !activeCase?.case?.id) {
+      return;
+    }
+
+    if (activeCase.updates && activeCase.updates.length <= 1) {
+      setError("Cannot remove the last case step.");
       return;
     }
 
@@ -1297,16 +1344,58 @@ export default function MessagingClient() {
                   <p className="panel-kicker">Case inbox</p>
                   <h2>Open an assigned case</h2>
                 </div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <select 
+                    value={caseFilter} 
+                    onChange={(e) => setCaseFilter(e.target.value)}
+                    style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #ccc', background: 'white' }}
+                  >
+                    <option value="all">All cases</option>
+                    <option value="pending">Pending</option>
+                    <option value="inprogress">In Progress</option>
+                    <option value="declined">Declined</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => setShowHiddenCompletedCases((current) => !current)}
+                  >
+                    {showHiddenCompletedCases ? "Hide hidden cases" : "Show hidden cases"}
+                  </button>
+                </div>
               </div>
+              <p className="muted" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
+                Completed or declined cases can be hidden from this list. Use "Show hidden cases" to bring them back.
+              </p>
 
               <div className="case-list">
                 {loadingCases ? (
                   <p className="muted">Loading cases...</p>
                 ) : sortedCases.length > 0 ? (
-                  sortedCases.map((item) => renderCaseListItem(item, item.clientName, item.lawyerName || item.title))
+                  sortedCases.map((item) => (
+                    <div key={item.id} style={{ marginBottom: "1rem" }}>
+                      {renderCaseListItem(item, item.clientName, item.lawyerName || item.title)}
+                      {(item.decisionStatus === "completed" || item.decisionStatus === "declined") ? (
+                        <div style={{ marginTop: "0.75rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", padding: "0 0.5rem" }}>
+                          <small style={{ color: "#6b7280" }}>
+                            {item.hiddenByLawyer ? "Hidden from your default list" : "Visible in your default list"}
+                          </small>
+                          <button
+                            type="button"
+                            className="button-secondary"
+                            onClick={() => handleCaseVisibilityToggle(item, !item.hiddenByLawyer)}
+                          >
+                            {item.hiddenByLawyer ? "Show case" : "Hide case"}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))
                 ) : (
                   <p className="muted">No case requests have been assigned to this lawyer account yet.</p>
-                )}              </div>
+                )}
+              </div>
             </div>
           ) : activeCase ? (
             <div className="panel messaging-panel">
@@ -1504,16 +1593,30 @@ export default function MessagingClient() {
               <h2>{isLawyer ? "Assigned case requests" : isClient ? "Open a case or start a new request" : "Choose a lawyer and describe the issue"}</h2>
             </div>
             {(isLawyer || isClient) ? (
-              <button
-                type="button"
-                className="button-secondary"
-                onClick={() => setShowHiddenCompletedCases((current) => !current)}
-              >
-                {showHiddenCompletedCases ? "Hide hidden cases" : "Show hidden cases"}
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <select 
+                  value={caseFilter} 
+                  onChange={(e) => setCaseFilter(e.target.value)}
+                  style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #ccc', background: 'white' }}
+                >
+                  <option value="all">All cases</option>
+                  <option value="pending">Pending</option>
+                  <option value="inprogress">In Progress</option>
+                  <option value="completed">Completed</option>
+                </select>
+                {isLawyer ? (
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => setShowHiddenCompletedCases((current) => !current)}
+                  >
+                    {showHiddenCompletedCases ? "Hide hidden cases" : "Show hidden cases"}
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </div>
-          {(isLawyer || isClient) ? (
+          {isLawyer ? (
             <p className="muted" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
               Completed or declined cases can be hidden from this list. Use "Show hidden cases" to bring them back.
             </p>
@@ -1554,17 +1657,17 @@ export default function MessagingClient() {
                       <small>{item.status}</small>
                     )}
                   </button>
-                  {(item.decisionStatus === "completed" || item.decisionStatus === "declined") && (isLawyer || isClient) ? (
+                  {(item.decisionStatus === "completed" || item.decisionStatus === "declined") && isLawyer ? (
                     <div style={{ marginTop: "0.75rem", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
                       <small style={{ color: "#6b7280" }}>
-                        {(isLawyer ? item.hiddenByLawyer : item.hiddenByClient) ? "Hidden from your default list" : "Visible in your default list"}
+                        {item.hiddenByLawyer ? "Hidden from your default list" : "Visible in your default list"}
                       </small>
                       <button
                         type="button"
                         className="button-secondary"
-                        onClick={() => handleCaseVisibilityToggle(item, isLawyer ? !item.hiddenByLawyer : !item.hiddenByClient)}
+                        onClick={() => handleCaseVisibilityToggle(item, !item.hiddenByLawyer)}
                       >
-                        {(isLawyer ? item.hiddenByLawyer : item.hiddenByClient) ? "Show case" : "Hide case"}
+                        {item.hiddenByLawyer ? "Show case" : "Hide case"}
                       </button>
                     </div>
                   ) : null}
