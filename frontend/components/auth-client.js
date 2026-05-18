@@ -72,7 +72,13 @@ export default function AuthClient() {
     try {
       const session = await loginUser({ email, password });
       saveSession(session);
-      router.push("/messaging");
+      if (session.role === "admin") {
+        router.push("/admin/statistics");
+      } else if (session.role === "lawyer") {
+        router.push("/messaging");
+      } else {
+        router.push("/home");
+      }
     } catch (requestError) {
       setError(requestError.message);
       setStatus("");

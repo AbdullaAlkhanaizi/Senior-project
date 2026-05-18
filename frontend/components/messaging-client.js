@@ -164,6 +164,9 @@ export default function MessagingClient() {
           setSelectedLawyerId(dashboardData.lawyers[0].id);
         }
 
+        const reviewsData = await getReviews();
+        setReviews(reviewsData || []);
+
         if (!currentSession?.token) {
           setCases([]);
           setActiveCase(null);

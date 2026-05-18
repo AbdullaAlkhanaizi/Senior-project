@@ -76,6 +76,9 @@ func main() {
 		log.Fatalf("rows err: %v", err)
 	}
 
+	// Clear old reviews and cases if we want a fresh start, but for now let's just clear reviews to replace them with the new varied ones
+	db.ExecContext(ctx, `DELETE FROM reviews`)
+
 	for _, lawyer := range lawyers {
 		log.Printf("Seeding data for lawyer: %s", lawyer.Name)
 
@@ -84,9 +87,10 @@ func main() {
 		seedCase(ctx, db, lawyer.ID, clientUserID, "completed")
 		seedCase(ctx, db, lawyer.ID, clientUserID, "declined")
 
-		// Also add a couple of reviews if they don't have them
-		seedReview(ctx, db, lawyer.ID, clientUserID)
-		seedReview(ctx, db, lawyer.ID, clientUserID)
+		numReviews := rand.Intn(11) + 5 // 5 to 15 reviews
+		for i := 0; i < numReviews; i++ {
+			seedReview(ctx, db, lawyer.ID, clientUserID)
+		}
 	}
 
 	log.Println("Successfully seeded cases and reviews.")
@@ -193,7 +197,8 @@ func seedReview(ctx context.Context, db *sql.DB, lawyerID, clientUserID int64) {
 	
 	title := titles[rand.Intn(len(titles))]
 	body := bodies[rand.Intn(len(bodies))]
-	rating := rand.Intn(2) + 4 // 4 or 5 stars
+	ratingOptions := []int{1, 2, 3, 3, 4, 4, 4, 5, 5, 5}
+	rating := ratingOptions[rand.Intn(len(ratingOptions))]
 	
 	db.ExecContext(ctx, `
 		INSERT INTO reviews (user_id, lawyer_id, title, body, rating, created_at)

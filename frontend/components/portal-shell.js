@@ -48,20 +48,21 @@ export default function PortalShell({ title, description, hideHero, showEyebrow 
   const isAdmin = role === "admin";
   const showMessaging = role !== "admin";
   const isGuest = !session?.token;
-  const homeHref = isAdmin ? "/admin/statistics" : "/messaging";
-  const homeActive = isAdmin ? pathname === "/admin/statistics" : pathname === "/messaging";
+  const homeHref = isAdmin ? "/admin/statistics" : "/home";
+  const homeActive = pathname === "/home" || (isAdmin && pathname === "/admin/statistics");
+  const logoHref = role === "admin" ? "/admin/statistics" : role === "lawyer" ? "/messaging" : "/home";
 
   return (
     <div className="portal-layout">
       <div className="portal-nav-shell">
         <header className="portal-navbar">
-          <Link href="/" className="portal-brand">
+          <Link href={logoHref} className="portal-brand">
             Qanoni
           </Link>
           <div className="portal-nav-right">
             <nav className="portal-links">
-              {isAdmin ? (
-                <Link href={homeHref} className={homeActive ? "active" : ""}>Home</Link>
+              {role !== "lawyer" ? (
+                <Link href={homeHref} className={homeActive ? "active" : ""}>{isAdmin ? "Stats" : "Home"}</Link>
               ) : null}
               <Link href="/ai" className={pathname === "/ai" ? "active" : ""}>AI</Link>
               {isAdmin ? (
