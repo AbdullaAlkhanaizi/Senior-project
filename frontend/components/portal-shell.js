@@ -70,7 +70,7 @@ export default function PortalShell({ title, description, hideHero, showEyebrow 
               {isAdmin ? (
                 <Link href="/admin/users" className={pathname === "/admin/users" ? "active" : ""}>Users</Link>
               ) : null}
-              {!isAdmin ? (
+              {!isAdmin && role !== "lawyer" ? (
                 <Link href="/review" className={pathname === "/review" ? "active" : ""}>Reviews</Link>
               ) : null}
               {showMessaging ? (
