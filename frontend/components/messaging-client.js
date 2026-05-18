@@ -301,7 +301,7 @@ export default function MessagingClient() {
   const canMessage = activeCase?.case?.decisionStatus === "accepted" && !isGuest;
   const isExpandedWorkspace =
     (isClient && (clientView === "details" || clientView === "create")) ||
-    (isLawyer && lawyerView === "details");
+    isLawyer;
 
   const caseLabel = useMemo(() => {
     if (!activeCase) {
@@ -1338,38 +1338,53 @@ export default function MessagingClient() {
 
         <section className={`grid lower-grid single-panel-grid client-messaging-grid ${isExpandedWorkspace ? "expanded" : ""}`}>
           {lawyerView === "list" ? (
-            <div className="panel referral-panel">
-              <div className="panel-header">
-                <div>
-                  <p className="panel-kicker">Case inbox</p>
-                  <h2>Open an assigned case</h2>
+            <div className="client-case-shell" style={{ gridTemplateColumns: "minmax(200px, 0.22fr) minmax(0, 1fr)" }}>
+              <aside className="client-case-sidebar">
+                <div className="client-case-sidebar-header">
+                  <p className="panel-kicker">Filters</p>
+                  <h3>View options</h3>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <select 
-                    value={caseFilter} 
-                    onChange={(e) => setCaseFilter(e.target.value)}
-                    style={{ padding: '6px 12px', borderRadius: '4px', border: '1px solid #ccc', background: 'white' }}
-                  >
-                    <option value="all">All cases</option>
-                    <option value="pending">Pending</option>
-                    <option value="inprogress">In Progress</option>
-                    <option value="declined">Declined</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                  <button
-                    type="button"
-                    className="button-secondary"
-                    onClick={() => setShowHiddenCompletedCases((current) => !current)}
-                  >
-                    {showHiddenCompletedCases ? "Hide hidden cases" : "Show hidden cases"}
-                  </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '1rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#4b5563' }}>Filter by status</label>
+                    <select 
+                      value={caseFilter} 
+                      onChange={(e) => setCaseFilter(e.target.value)}
+                      style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', background: 'white', width: '100%', outline: 'none' }}
+                    >
+                      <option value="all">All cases</option>
+                      <option value="pending">Pending</option>
+                      <option value="inprogress">In Progress</option>
+                      <option value="declined">Declined</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#4b5563' }}>Hidden cases</label>
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      onClick={() => setShowHiddenCompletedCases((current) => !current)}
+                      style={{ width: '100%', justifyContent: 'center' }}
+                    >
+                      {showHiddenCompletedCases ? "Hide hidden cases" : "Show hidden cases"}
+                    </button>
+                    <p className="muted" style={{ fontSize: '0.75rem', margin: 0, lineHeight: 1.4 }}>
+                      Completed or declined cases can be hidden from the main list.
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <p className="muted" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
-                Completed or declined cases can be hidden from this list. Use "Show hidden cases" to bring them back.
-              </p>
+              </aside>
 
-              <div className="case-list">
+              <div className="client-case-main panel referral-panel" style={{ margin: 0 }}>
+                <div className="panel-header">
+                  <div>
+                    <p className="panel-kicker">Case inbox</p>
+                    <h2>Open an assigned case</h2>
+                  </div>
+                </div>
+
+                <div className="case-list">
                 {loadingCases ? (
                   <p className="muted">Loading cases...</p>
                 ) : sortedCases.length > 0 ? (
@@ -1397,6 +1412,7 @@ export default function MessagingClient() {
                 )}
               </div>
             </div>
+          </div>
           ) : activeCase ? (
             <div className="panel messaging-panel">
               <div className="panel-header">
