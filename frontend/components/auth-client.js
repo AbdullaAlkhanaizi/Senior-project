@@ -91,7 +91,7 @@ export default function AuthClient() {
     try {
       const session = await continueAsGuest({ name: "Guest User" });
       saveSession(session);
-      router.push("/messaging");
+      router.push("/home");
     } catch (requestError) {
       setError(requestError.message);
       setStatus("");

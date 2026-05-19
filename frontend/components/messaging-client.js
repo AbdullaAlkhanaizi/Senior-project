@@ -679,7 +679,7 @@ export default function MessagingClient() {
       setIssueSummary("");
       setSelectedCaseId(data.case.id);
       setActiveCase(data);
-      setClientView("details");
+      setClientView("list");
       await refreshCases(data.case.id);
       setStatus(`Case request sent to ${data.lawyer.name}.`);
     } catch (requestError) {
@@ -727,10 +727,15 @@ export default function MessagingClient() {
         body: messageInput
       });
 
-      setActiveCase((current) => ({
-        ...current,
-        messages: [...current.messages, data]
-      }));
+      setActiveCase((current) => {
+        if (current.messages.some(m => m.id === data.id)) {
+          return current;
+        }
+        return {
+          ...current,
+          messages: [...current.messages, data]
+        };
+      });
       setMessageInput("");
       setStatus("Message sent.");
     } catch (requestError) {
@@ -755,10 +760,15 @@ export default function MessagingClient() {
       formData.append("message", `Uploaded file: ${file.name}`);
 
       const data = await uploadCaseAttachment(activeCase.case.id, formData);
-      setActiveCase((current) => ({
-        ...current,
-        messages: [...current.messages, data]
-      }));
+      setActiveCase((current) => {
+        if (current.messages.some(m => m.id === data.id)) {
+          return current;
+        }
+        return {
+          ...current,
+          messages: [...current.messages, data]
+        };
+      });
       setStatus(`Uploaded ${file.name}.`);
       event.target.value = "";
     } catch (requestError) {

@@ -29,7 +29,7 @@ function renderStatCard(label, value, helper, options = {}) {
       onClick={options.onClick}
       title={options.title}
     >
-      <h3 style={{ fontSize: "2.7rem", margin: "0 0 0.5rem 0", color: "var(--color-primary)" }}>{value}</h3>
+      <h3 style={{ fontSize: "1.5rem", margin: "0 0 0.5rem 0", color: "var(--color-primary)" }}>{value}</h3>
       <p style={{ margin: 0, fontWeight: "bold" }}>{label}</p>
       {helper ? <p style={{ margin: "0.4rem 0 0 0", fontSize: "0.9rem", opacity: 0.75 }}>{helper}</p> : null}
     </div>
