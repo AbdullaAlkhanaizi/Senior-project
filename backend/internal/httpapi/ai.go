@@ -158,7 +158,7 @@ func buildAISystemPrompt(mode, category, jurisdiction, lawsContext string) strin
 	builder.WriteString("A request is NON-LEGAL if it is unrelated to laws, legal rights, legal duties, legal procedures, legal documents, legal disputes, or legal risk.\n\n")
 
 	builder.WriteString("If the request is SIMPLE-DIRECT, answer in exactly one sentence using this exact structure:\n")
-	builder.WriteString("[Yes/No], [briefly state what is allowed or prohibited], as per [Exact Formal Title of the Law/Decree and Article].\n\n")
+	builder.WriteString("[Yes/No], [briefly state what is allowed or prohibited], as per [Exact Formal Title of the Law/Decree], Article [Exact Article Number]. You MUST include the exact Article number.\n\n")
 
 	builder.WriteString("If the request is COMPLEX-UNCERTAIN, do NOT guess, do NOT balance possibilities, and do NOT provide a partial legal conclusion.\n")
 	builder.WriteString("Instead, answer in exactly one sentence using this exact structure:\n")
