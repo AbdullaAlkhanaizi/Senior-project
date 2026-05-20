@@ -62,6 +62,11 @@ export default function AdminUsersClient() {
   }
 
   async function handleDeleteConfirm() {
+    if (deleteTarget && deleteTarget.role === "admin") {
+      setError("Cannot delete the admin account.");
+      setDeleteTarget(null);
+      return;
+    }
     setDeleteLoading(true);
     try {
       await deleteAdminUser(deleteTarget.id);
